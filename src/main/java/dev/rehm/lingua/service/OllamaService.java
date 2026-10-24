@@ -129,15 +129,8 @@ public class OllamaService {
 
 
             if (hasToolCalling) {
-                if (remainingToolCalling <= 0) {
 
-                    soutMessagList(memory.getMessages());
-                    soutLoopLimits(remainingToolCalling, remainingIterations, iterations);
-                    System.out.println("--------------Error-End---------------");
-
-                    return "Elfogyott az eszköz hívási keret, így a feladat meg lett szakítva.";
-                }
-                toolCallingProcess(response);
+                toolCallProcess(response, remainingToolCalling);
                 remainingToolCalling--;
 
             }
@@ -157,6 +150,63 @@ public class OllamaService {
 
         return response;
     }
+
+    private void toolCallProcess(OllamaChatResponse response, int remainingToolCalling) {
+        List<ToolCallResponse> toolCallResponses = new ArrayList<>(List.copyOf(response.message().toolCalls()));
+
+        for (ToolCallResponse toolCallRespons : toolCallResponses) {
+
+            if (remainingToolCalling <= 0) {
+
+                soutMessagList(memory.getMessages());
+                System.out.println("fenn maradó eszközhívások : " + remainingToolCalling);
+                System.out.println("--------------Error-End---------------");
+
+            }
+
+            choiceTodol(toolCallRespons);
+        }
+    }
+
+    private void choiceTodol(ToolCallResponse toolCallResponse) {
+
+
+        String toolName = toolCallResponse.function().name();
+        Map<String, Object> arguments = toolCallResponse.function().arguments();
+            switch (toolName) {
+                case "add":
+                    Object ab = arguments.get("a");
+                    double a = 0;
+                    Object bb = arguments.get("b");
+                    double b = 0;
+                    if (ab instanceof Number) {
+                        a = ((Number) ab).doubleValue();
+                    }
+                    if (bb instanceof Number) {
+                        b = ((Number) bb).doubleValue();
+                    }
+                    Double result = calculatorTools.add(a, b);
+
+                    adddToolMessageToOllamaMessageList(toolName,result);
+                    break;
+                default:
+                    throw new IllegalStateException("valami elbaszoódott xDD");
+            }
+
+    }
+
+    private void adddToolMessageToOllamaMessageList(String toolName, Object result) {
+                OllamaMessageDto message = new OllamaMessageDto(
+                        "tool",
+                        toolName,
+                        String.valueOf(result),
+                        null
+                );
+                saveMessages(message);
+
+
+    }
+
 
     private void toolCallingProcess(OllamaChatResponse response) {
         Map<String, ToolResponseFunction> toolCalling = new HashMap<>();
