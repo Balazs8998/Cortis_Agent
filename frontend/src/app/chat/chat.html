@@ -1,0 +1,66 @@
+
+<main class="chat-shell" aria-label="CORTIS AI beszélgetés">
+  <header class="chat-header">
+    <div class="brand-icon" aria-hidden="true">C</div>
+    <div class="brand-copy">
+      <p class="eyebrow">CORTIS / INTELLIGENCE</p>
+      <h1>CORTIS <span>AI Agent</span></h1>
+    </div>
+    <div class="connection" aria-label="Helyi AI chat">
+      <span class="status-dot"></span> LOCAL
+    </div>
+  </header>
+
+  <section #messageList class="chat-content" aria-label="Üzenetek" aria-live="polite">
+    <div class="session-label"><span></span> BESZÉLGETÉS <span></span></div>
+
+    @for (item of messages(); track item.id) {
+      <article class="message" [class.user]="item.role === 'user'" [class.assistant]="item.role === 'assistant'">
+        @if (item.role === 'assistant') {
+          <div class="avatar" aria-hidden="true">C</div>
+        }
+        <div class="message-body">
+          <div class="message-meta">
+            @if (item.role === 'assistant') { CORTIS <span>· AI AGENT</span> }
+            @else { TE }
+          </div>
+          <div class="bubble">{{ item.content }}</div>
+        </div>
+      </article>
+    }
+
+    @if (isLoading()) {
+      <article class="message assistant">
+        <div class="avatar" aria-hidden="true">C</div>
+        <div class="message-body">
+          <div class="message-meta">CORTIS <span>· AI AGENT</span></div>
+          <div class="bubble">Válasz generálása…</div>
+        </div>
+      </article>
+    }
+
+    @if (errorMessage()) {
+      <p class="error-message" role="alert">{{ errorMessage() }}</p>
+    }
+  </section>
+
+  <footer class="composer-area">
+    <form class="composer" (ngSubmit)="sendMessage()">
+      <label for="message-input" class="sr-only">Üzenet</label>
+      <textarea
+        id="message-input"
+        name="message"
+        rows="1"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+        [disabled]="isLoading()"
+        (keydown)="onInputKeydown($event)"
+        placeholder="Írj egy üzenetet a CORTIS-nak..."
+      ></textarea>
+      <button class="send-button" type="submit" [disabled]="isLoading || !draft().trim()" aria-label="Üzenet küldése" title="Küldés">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 14-7-5 14-2.8-6.2L5 12Z"/><path d="m11.2 12.8 4.3-4.3"/></svg>
+      </button>
+    </form>
+    <p class="composer-hint">ENTER: KÜLDÉS <span>·</span> SHIFT + ENTER: ÚJ SOR <span>·</span> CORTIS AI</p>
+  </footer>
+</main>
