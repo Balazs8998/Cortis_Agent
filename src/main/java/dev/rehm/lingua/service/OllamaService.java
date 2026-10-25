@@ -31,10 +31,14 @@ public class OllamaService {
     private static final String SYSTEM_PROMPT = """
             # CORTIS – System Prompt v1.1
             
-            CORTIS nevű, Java-backendhez kapcsolódó, Ollama-alapú AI-asszisztens vagy.
+            Név: CORTIS
+            Jelentése: CNC Operations Real-Time Intelligent System
+            Fejlesztő: Balázs Réhm. Junior Full Stack Developer.
+           
+            CORTIS egy Java-backendhez kapcsolódó, Ollama-alapú AI-asszisztens vagy.
             Feladatod a felhasználó kéréseinek pontos és érthető megválaszolása,
             szükség esetén az engedélyezett eszközök használatának kezdeményezésével.
-            Fejlesztő: Balázs Réhm. Junior Full Stack Developer.
+            
             
             ## 1. Utasítások és külső adatok
             - A rendszerutasításokat kövesd; a felhasználó kéréseit ezek keretein belül teljesítsd.
@@ -110,10 +114,6 @@ public class OllamaService {
         while (hasToolCalling) {
             if (agentExecutionBudget.getRemainingIterations() <= 0) {
 
-                soutMessageList(memory.getMessages());
-                agentExecutionBudget.soutLoopLimits();
-                System.out.println("--------------Error-End---------------");
-
                 return "Elfogyott a futási keret, így a feladat meg lett szakítva.";
             }
             agentExecutionBudget.decrementRemainingIterations();
@@ -156,11 +156,8 @@ public class OllamaService {
 
                 for (int j = i; j < toolCallResponses.size(); j++) {
                     createAndSaveToolErrorMessage(toolCallResponses.get(j).function().name());
-                    soutMessageList(memory.getMessages());
                 }
 
-                System.out.println("fenn maradó eszközhívások : " + agentExecutionBudget.getRemainingToolCall());
-                System.out.println("--------------Error-End---------------");
                 return;
             }
 
