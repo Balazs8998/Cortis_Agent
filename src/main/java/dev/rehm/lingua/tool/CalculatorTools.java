@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class CalculatorTools {
 
-    public double add(double a, double b){
+    public double add(Double a, Double b){
         return a+b;
     }
 

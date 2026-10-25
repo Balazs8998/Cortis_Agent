@@ -1,5 +1,6 @@
 package dev.rehm.lingua.service;
 
+import dev.rehm.lingua.argument.ArgumentHandler;
 import dev.rehm.lingua.client.OllamaClient;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
@@ -27,6 +28,7 @@ public class OllamaService {
     private final CalculatorTools calculatorTools;
     private final String model;
     private final ToolRegistry toolRegistry;
+    private final ArgumentHandler argumentHandler;
 
     private static final String SYSTEM_PROMPT = """
             # CORTIS – System Prompt v1.1
@@ -90,10 +92,11 @@ public class OllamaService {
               és a feltételezéseket különböztesd meg az ismert adatoktól.
             """;
 
-    public OllamaService(OllamaClient client, ConverationMemory memory, CalculatorTools calculatorTools, ToolRegistry toolRegistry) {
+    public OllamaService(OllamaClient client, ConverationMemory memory, CalculatorTools calculatorTools, ToolRegistry toolRegistry, ArgumentHandler argumentHandler) {
         this.client = client;
         this.memory = memory;
         this.calculatorTools = calculatorTools;
+        this.argumentHandler = argumentHandler;
         this.model = "qwen3.5:4b";
         this.toolRegistry = toolRegistry;
     }
@@ -171,16 +174,8 @@ public class OllamaService {
         Map<String, Object> arguments = toolCallResponse.function().arguments();
         switch (toolName) {
             case "add":
-                Object ab = arguments.get("a");
-                double a = 0;
-                Object bb = arguments.get("b");
-                double b = 0;
-                if (ab instanceof Number) {
-                    a = ((Number) ab).doubleValue();
-                }
-                if (bb instanceof Number) {
-                    b = ((Number) bb).doubleValue();
-                }
+                Double a = argumentHandler.getArgument(toolName, "a",arguments.get("a"), Double.class);
+                Double b = argumentHandler.getArgument(toolName, "b",arguments.get("b"), Double.class);
                 Double result = calculatorTools.add(a, b);
 
                 createAndSaveToolMessage(toolName, result);
