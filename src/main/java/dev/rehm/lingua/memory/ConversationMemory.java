@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class ConverationMemory {
+public class ConversationMemory {
     private final List<OllamaMessageDto> messages = new ArrayList<>();
 
 

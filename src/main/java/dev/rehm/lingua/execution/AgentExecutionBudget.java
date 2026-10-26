@@ -46,9 +46,9 @@ public class AgentExecutionBudget {
         return iterations;
     }
 
-    public void soutLoopLimits() {
-        System.out.println("while futás szám: " + this.iterations);
-        System.out.println("loop határ száma: " + this.remainingIterations);
-        System.out.println("tool calling határ száma: " + this.remainingToolCall);
+    public void printLoopLimits() {
+        System.out.println("Loop iteration count: " + this.iterations);
+        System.out.println("Remaining loop iterations: " + this.remainingIterations);
+        System.out.println("Remaining tool calls: " + this.remainingToolCall);
     }
 }
