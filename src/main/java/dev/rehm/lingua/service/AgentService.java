@@ -1,7 +1,7 @@
 package dev.rehm.lingua.service;
 
 import dev.rehm.lingua.argument.ArgumentHandler;
-import dev.rehm.lingua.client.OllamaClient;
+
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
@@ -12,11 +12,13 @@ import dev.rehm.lingua.factory.RequestFactory;
 import dev.rehm.lingua.memory.ConversationMemory;
 import dev.rehm.lingua.registry.ToolRegistry;
 import dev.rehm.lingua.tool.CalculatorTools;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 
 @Service
@@ -41,13 +43,13 @@ public class AgentService {
         this.requestFactory = requestFactory;
     }
 
-    public String executeAgentLoop(String userMessage) {
+    public String executeAgentLoop(UUID uuid, String userMessage) {
         AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(2);
 
         boolean hasToolCalling = true;
         OllamaChatResponse response = null;
         OllamaMessageDto newMessage = MessageFactory.createUserMessageDto(userMessage);
-        messageService.saveMessages(newMessage);
+        messageService.saveMessages(uuid, newMessage);
 
         System.out.println("-------start-----------");
         agentExecutionBudget.printLoopLimits();
@@ -62,7 +64,7 @@ public class AgentService {
             agentExecutionBudget.decrementRemainingIterations();
             agentExecutionBudget.incrementIterations();
 
-            List<OllamaMessageDto> messages = new ArrayList<>(memory.getMessages());
+            List<OllamaMessageDto> messages = new ArrayList<>(memory.getMessageMap().get(uuid).getMessages());
 
             OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
             OllamaChatRequest ollamaChatRequestWithTool = requestFactory.addToolsToRequest(ollamaChatRequest);
@@ -72,22 +74,22 @@ public class AgentService {
             if (response == null || response.message() == null) {
                 throw new IllegalStateException("nincs response");
             }
-            messageService.saveMessages(response.message());
-            hasToolCalling = ollamaService.hasToolCalling(response);
+            messageService.saveMessages(uuid, response.message());
+            hasToolCalling = hasToolCalling(response);
 
             if (hasToolCalling) {
-                toolCallingProcess(response, agentExecutionBudget);
+                toolCallingProcess(uuid, response, agentExecutionBudget);
             }
 
         }
-        ollamaService.soutMessageList(memory.getMessages());
+        ollamaService.soutMessageList(memory.getMessageMap().get(uuid).getMessages());
         agentExecutionBudget.printLoopLimits();
         System.out.println("-------end-----------");
 
         return response.message().content();
     }
 
-    private void choiceTool(ToolCallResponse toolCallResponse) {
+    private void choiceTool(UUID uuid,ToolCallResponse toolCallResponse) {
         String toolName = toolCallResponse.function().name();
         Map<String, Object> arguments = toolCallResponse.function().arguments();
         switch (toolName) {
@@ -96,7 +98,7 @@ public class AgentService {
                 Double b = argumentHandler.getArgument(toolName, "b", arguments.get("b"), Double.class);
                 Double result = calculatorTools.add(a, b);
 
-                messageService.createAndSaveToolMessage(toolName, result);
+                messageService.createAndSaveToolMessage(uuid, toolName, result);
                 break;
             default:
                 throw new IllegalStateException("valami elbaszoódott xDD");
@@ -104,22 +106,29 @@ public class AgentService {
 
     }
 
-    private void toolCallingProcess(OllamaChatResponse response, AgentExecutionBudget agentExecutionBudget) {
+    private void toolCallingProcess(UUID uuid,OllamaChatResponse response, AgentExecutionBudget agentExecutionBudget) {
         List<ToolCallResponse> toolCallResponses = new ArrayList<>(response.message().toolCalls());
 
         for (int i = 0; i < toolCallResponses.size(); i++) {
             if (agentExecutionBudget.getRemainingToolCall() <= 0) {
 
                 for (int j = i; j < toolCallResponses.size(); j++) {
-                    messageService.createAndSaveToolErrorMessage(toolCallResponses.get(j).function().name());
+                    messageService.createAndSaveToolErrorMessage(uuid,toolCallResponses.get(j).function().name());
                 }
 
                 return;
             }
 
-            choiceTool(toolCallResponses.get(i));
+            choiceTool(uuid, toolCallResponses.get(i));
             agentExecutionBudget.decrementRemainingTools();
         }
+    }
+
+    private @NotNull boolean hasToolCalling(OllamaChatResponse response) {
+        if (response.message().toolCalls() == null) {
+            return false;
+        }
+        return !response.message().toolCalls().isEmpty();
     }
 
 }

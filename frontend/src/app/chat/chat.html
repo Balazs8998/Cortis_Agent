@@ -1,6 +1,23 @@
 
 <main class="chat-shell" aria-label="CORTIS AI beszélgetés">
   <header class="chat-header">
+
+    <button
+      class="back-button"
+      type="button"
+      (click)="backToHome()"
+      aria-label="Vissza a kezdőoldalra"
+      title="Back to Home"
+    >
+      ←
+    </button>
+
+    <div class="conversation-info">
+      <span>CONVERSATION</span>
+      <code>{{ conversationId().slice(0, 8) }}</code>
+    </div>
+
+
     <div class="brand-icon" aria-hidden="true">C</div>
     <div class="brand-copy">
       <p class="eyebrow">CORTIS / INTELLIGENCE</p>
@@ -57,7 +74,7 @@
         (keydown)="onInputKeydown($event)"
         placeholder="Írj egy üzenetet a CORTIS-nak..."
       ></textarea>
-      <button class="send-button" type="submit" [disabled]="isLoading || !draft().trim()" aria-label="Üzenet küldése" title="Küldés">
+      <button class="send-button" type="submit" [disabled]="isLoading() || !draft().trim()" aria-label="Üzenet küldése" title="Küldés">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 14-7-5 14-2.8-6.2L5 12Z"/><path d="m11.2 12.8 4.3-4.3"/></svg>
       </button>
     </form>

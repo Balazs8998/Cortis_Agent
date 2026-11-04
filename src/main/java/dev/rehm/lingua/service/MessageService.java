@@ -2,8 +2,9 @@ package dev.rehm.lingua.service;
 
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.memory.ConversationMemory;
-import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 public class MessageService {
@@ -84,26 +85,28 @@ public class MessageService {
             """;
 
     private final ConversationMemory memory;
+    private final ConversationService conversationService;
 
-    public MessageService(ConversationMemory memory) {
+    public MessageService(ConversationMemory memory, ConversationService conversationService) {
         this.memory = memory;
+        this.conversationService = conversationService;
     }
 
-    public void saveMessages(OllamaMessageDto message) {
-        memory.addMessage(message);
+    public void saveMessages(UUID uuid, OllamaMessageDto message) {
+        memory.addMessageToChat(uuid,message);
     }
 
-    public void createAndSaveToolMessage(String toolName, Object result) {
+    public void createAndSaveToolMessage(UUID uuid, String toolName, Object result) {
         OllamaMessageDto message = new OllamaMessageDto(
                 "tool",
                 toolName,
                 String.valueOf(result),
                 null
         );
-        saveMessages(message);
+        saveMessages(uuid, message);
     }
 
-    public void createAndSaveToolErrorMessage(String toolName) {
+    public void createAndSaveToolErrorMessage(UUID uuid, String toolName) {
         OllamaMessageDto message = new OllamaMessageDto(
                 "tool",
                 toolName,
@@ -111,10 +114,10 @@ public class MessageService {
                         " The task was interrupted. Inform the user that the task could not be completed. Do not fabricate missing results.",
                 null
         );
-        saveMessages(message);
+        saveMessages(uuid, message);
     }
 
-    public @NotNull OllamaMessageDto firstSystemMessage() {
+    public OllamaMessageDto firstSystemMessage() {
         return new OllamaMessageDto("system", null, SYSTEM_PROMPT, null);
 
     }
