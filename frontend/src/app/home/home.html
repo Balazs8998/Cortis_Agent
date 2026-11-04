@@ -1,0 +1,58 @@
+
+<main class="home-shell">
+
+  <header class="home-header">
+    <div class="logo">C</div>
+    <span class="brand">CORTIS</span>
+    <span class="version">AI AGENT</span>
+  </header>
+
+  <section class="hero">
+
+    <div class="hero-icon">C</div>
+
+    <p class="eyebrow">
+      INTELLIGENT AGENT SYSTEM
+    </p>
+
+    <h1>
+      Welcome to <span>CORTIS</span>
+    </h1>
+
+    <p class="description">
+      Your intelligent assistant, powered by local AI.
+      Start a new conversation to get started.
+    </p>
+
+    <button
+      class="new-chat-button"
+      type="button"
+      (click)="createNewChat()"
+      [disabled]="isLoading()"
+    >
+      @if (isLoading()) {
+        Creating conversation...
+      } @else {
+        <span class="plus">+</span>
+        New Chat
+      }
+    </button>
+
+    @if (errorMessage()) {
+      <p class="error-message" role="alert">
+        {{ errorMessage() }}
+      </p>
+    }
+
+    <p class="helper-text">
+      A new conversation will be created.
+    </p>
+
+  </section>
+
+  <footer class="home-footer">
+    <span>CORTIS AI AGENT</span>
+    <span>Developed by Balázs Rehm</span>
+  </footer>
+
+</main>

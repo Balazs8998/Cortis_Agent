@@ -23,6 +23,54 @@
   box-sizing: border-box;
 }
 
+
+.back-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid rgba(137, 178, 215, 0.2);
+  border-radius: 10px;
+  background: rgba(78, 208, 255, 0.05);
+  color: #4ed0ff;
+  font-size: 23px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.back-button:hover {
+  background: rgba(78, 208, 255, 0.15);
+}
+
+.back-button:focus-visible {
+  outline: 2px solid #4ed0ff;
+  outline-offset: 3px;
+}
+
+.conversation-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-left: auto;
+  color: #91a5b7;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.conversation-info code {
+  color: #4ed0ff;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 600px) {
+  .conversation-info {
+    display: none;
+  }
+}
+
+
 /* MAIN CHAT */
 
 .chat-shell {

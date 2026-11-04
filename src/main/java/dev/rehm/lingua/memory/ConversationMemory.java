@@ -1,22 +1,32 @@
 package dev.rehm.lingua.memory;
 
+import dev.rehm.lingua.domain.ConversationMessage;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class ConversationMemory {
-    private final List<OllamaMessageDto> messages = new ArrayList<>();
 
+    private final Map<UUID, ConversationMessage> messageMap;
 
-    public void addMessage(OllamaMessageDto messageDto){
-        this.messages.add(messageDto);
+    public ConversationMemory() {
+        this.messageMap = new ConcurrentHashMap<>();
     }
 
-    public List<OllamaMessageDto> getMessages() {
-        return List.copyOf(messages);
+    public void addNewChat(ConversationMessage message){
+        messageMap.put(message.getUuid(),message);
     }
 
+    public void addMessageToChat(UUID uuid,OllamaMessageDto message){
+        messageMap.get(uuid).addMessage(message);
+    }
+
+    public Map<UUID, ConversationMessage> getMessageMap() {
+        return Map.copyOf(messageMap);
+    }
 }
