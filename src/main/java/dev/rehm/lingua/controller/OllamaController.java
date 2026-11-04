@@ -2,7 +2,7 @@ package dev.rehm.lingua.controller;
 
 import dev.rehm.lingua.dto.request.ChatRequest;
 import dev.rehm.lingua.dto.response.ChatResponse;
-import dev.rehm.lingua.service.OllamaService;
+import dev.rehm.lingua.service.AgentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,16 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/ollama")
 public class OllamaController {
 
-    private final OllamaService ollamaService;
+    private final AgentService agentService;
 
 
-    public OllamaController(OllamaService ollamaService) {
-        this.ollamaService = ollamaService;
+    public OllamaController(AgentService agentService) {
+        this.agentService = agentService;
     }
 
     @PostMapping("/chat")
     public ResponseEntity<ChatResponse> ollamaChat(@RequestBody ChatRequest request){
-        String answer = this.ollamaService.executeAgentLoop(request.message());
+        String answer = this.agentService.executeAgentLoop(request.message());
 
         ChatResponse response = new ChatResponse(answer);
 

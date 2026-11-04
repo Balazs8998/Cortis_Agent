@@ -1,5 +1,6 @@
 package dev.rehm.lingua.argument;
 
+import dev.rehm.lingua.exception.classes.ArgumentValidationException;
 import tools.jackson.databind.ObjectMapper;
 import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
 import dev.rehm.lingua.registry.ToolRegistry;
@@ -22,6 +23,18 @@ public class ArgumentHandler {
             throw new IllegalArgumentException(
                     "Argument value is missing or null. The operation has been aborted."
             );
+        }
+
+        if (toolName == null){
+            throw new IllegalArgumentException("Tool name is missing or null. The operation ha been aborted.");
+        }
+
+        if (argumentName == null){
+            throw new IllegalArgumentException("Argument name is missing or null. The operation ha been aborted.");
+        }
+
+        if (targetType == null){
+            throw new IllegalArgumentException("Target type is missing or null. The operation ha been aborted.");
         }
 
         if (!validateArgument(toolName, argumentName, argumentValue)) {
@@ -49,14 +62,14 @@ public class ArgumentHandler {
             properties = toolRegistry.getToolregistry().get(toolName).parameters().properties().get(argumentName);
         }
         if(properties == null){
-            throw new IllegalArgumentException(
-                    "Argument properties not found. The operation has been aborted."
+            throw new ArgumentValidationException(toolName,"ToolRegistry/Properties", null,
+                    "Argument properties not found. The operation has been aborted.", "TOOL_PROPERTIES_NULL"
             );
         }
 
         if(properties.type() == null){
-            throw new IllegalArgumentException(
-                    "Argument type not found. The operation has been aborted."
+            throw new ArgumentValidationException(toolName,"ToolRegistry/Properties.type", null,
+                    "Argument type not found. The operation has been aborted.","TOOL_PROPERTIES_TYPE_NULL"
             );
         }
 
