@@ -47,7 +47,7 @@ public class AgentService {
 
     public String executeAgentLoop(UUID uuid, String userMessage) {
 
-        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(5,2);
+        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(3,2);
 
         boolean hasToolCalling = true;
         OllamaChatResponse response = null;
@@ -59,7 +59,6 @@ public class AgentService {
         System.out.println("------------------");
 
         while (hasToolCalling) {
-
             List<OllamaMessageDto> messages = new ArrayList<>(conversationService.getMessageList(uuid));
 
             if (agentExecutionBudget.getRemainingIterations() <= 0) {
@@ -68,76 +67,27 @@ public class AgentService {
                         MessageFactory.createSystemMessageDto("Agent iteration limit reached. "
                                 + "Report confirmed results and identify incomplete tasks.");
 
+                 messages.add(iterationMessage);
 
-                messageService.saveMessages(uuid, iterationMessage);
+                OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
 
-                List<OllamaMessageDto> messages1 = new ArrayList<>(conversationService.getMessageList(uuid));
-
-                OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages1);
-                OllamaChatRequest ollamaChatRequestWithTool = requestFactory.addToolsToRequest(ollamaChatRequest);
-
-                response = ollamaService.messageSend(ollamaChatRequestWithTool);
-
-                if (response == null) {
-                    throw new UnexpectedNullValueException(
-                            "OllamaResponse",
-                            "response",
-                            null,
-                            "Ollama returned a null response.",
-                            "OLLAMA_RESPONSE_NULL"
-                    );
-                }
-
-                if (response.message() == null) {
-                    throw new UnexpectedNullValueException(
-                            "OllamaResponse",
-                            "message",
-                            null,
-                            "Ollama response does not contain a message.",
-                            "OLLAMA_MESSAGE_NULL"
-                    );
-                }
+                response = agentMessage(ollamaChatRequest);
+                messageService.saveMessages(uuid, response.message());
 
                 ollamaService.soutMessageList(conversationService.getMessageList(uuid));
                 agentExecutionBudget.printLoopLimits();
                 System.out.println("-------end-----------");
-
-                return response.message().content();
-
+                 return response.message().content();
             }
-
-            agentExecutionBudget.decrementRemainingIterations();
-            agentExecutionBudget.incrementIterations();
-
-
 
             OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
             OllamaChatRequest ollamaChatRequestWithTool = requestFactory.addToolsToRequest(ollamaChatRequest);
 
+            agentExecutionBudget.decrementRemainingIterations();
+            agentExecutionBudget.incrementIterations();
 
+            response = agentMessage(ollamaChatRequestWithTool);
 
-                response = ollamaService.messageSend(ollamaChatRequestWithTool);
-
-
-            if (response == null) {
-                throw new UnexpectedNullValueException(
-                        "OllamaResponse",
-                        "response",
-                        null,
-                        "Ollama returned a null response.",
-                        "OLLAMA_RESPONSE_NULL"
-                );
-            }
-
-            if (response.message() == null) {
-                throw new UnexpectedNullValueException(
-                        "OllamaResponse",
-                        "message",
-                        null,
-                        "Ollama response does not contain a message.",
-                        "OLLAMA_MESSAGE_NULL"
-                );
-            }
             messageService.saveMessages(uuid, response.message());
             hasToolCalling = hasToolCalling(response);
 
@@ -151,6 +101,34 @@ public class AgentService {
         System.out.println("-------end-----------");
 
         return response.message().content();
+    }
+
+    private OllamaChatResponse agentMessage(OllamaChatRequest request){
+
+        OllamaChatResponse response = ollamaService.messageSend(request);
+
+        if (response == null) {
+            throw new UnexpectedNullValueException(
+                    "OllamaResponse",
+                    "response",
+                    null,
+                    "Ollama returned a null response.",
+                    "OLLAMA_RESPONSE_NULL"
+            );
+        }
+
+        if (response.message() == null) {
+            throw new UnexpectedNullValueException(
+                    "OllamaResponse",
+                    "message",
+                    null,
+                    "Ollama response does not contain a message.",
+                    "OLLAMA_MESSAGE_NULL"
+            );
+        }
+
+        return response;
+
     }
 
     private void choiceTool(UUID uuid,ToolCallResponse toolCallResponse) {
