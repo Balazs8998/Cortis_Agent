@@ -1,7 +1,6 @@
 package dev.rehm.lingua.service;
 
 import dev.rehm.lingua.argument.ArgumentHandler;
-
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
@@ -12,7 +11,7 @@ import dev.rehm.lingua.factory.MessageFactory;
 import dev.rehm.lingua.factory.RequestFactory;
 import dev.rehm.lingua.memory.ConversationMemory;
 import dev.rehm.lingua.registry.ToolRegistry;
-import dev.rehm.lingua.tool.CalculatorTools;
+import dev.rehm.lingua.tool.AgentTool;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 
@@ -28,26 +27,27 @@ public class AgentService {
     private final OllamaService ollamaService;
     private final MessageService messageService;
     private final ConversationMemory memory;
-    private final CalculatorTools calculatorTools;
     private final ArgumentHandler argumentHandler;
     private final RequestFactory requestFactory;
+    private final ToolRegistry toolRegistry;
     private final ConversationService conversationService;
 
 
-    public AgentService(MessageService messageService, ConversationMemory memory, CalculatorTools calculatorTools, ToolRegistry toolRegistry, OllamaService ollamaService, ArgumentHandler argumentHandler, RequestFactory requestFactory, ConversationService conversationService) {
+    public AgentService(MessageService messageService, ConversationMemory memory, ToolRegistry toolRegistry, OllamaService ollamaService, ArgumentHandler argumentHandler, RequestFactory requestFactory, ToolRegistry toolRegistry1, ConversationService conversationService) {
 
         this.messageService = messageService;
         this.memory = memory;
-        this.calculatorTools = calculatorTools;
+
         this.ollamaService = ollamaService;
         this.argumentHandler = argumentHandler;
         this.requestFactory = requestFactory;
+        this.toolRegistry = toolRegistry1;
         this.conversationService = conversationService;
     }
 
     public String executeAgentLoop(UUID uuid, String userMessage) {
 
-        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(3,2);
+        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(3,4);
 
         boolean hasToolCalling = true;
         OllamaChatResponse response = null;
@@ -134,17 +134,11 @@ public class AgentService {
     private void choiceTool(UUID uuid,ToolCallResponse toolCallResponse) {
         String toolName = toolCallResponse.function().name();
         Map<String, Object> arguments = toolCallResponse.function().arguments();
-        switch (toolName) {
-            case "add":
-                Double a = argumentHandler.getArgument(toolName, "a", arguments.get("a"), Double.class);
-                Double b = argumentHandler.getArgument(toolName, "b", arguments.get("b"), Double.class);
-                Double result = calculatorTools.add(a, b);
 
-                messageService.createAndSaveToolMessage(uuid, toolName, result);
-                break;
-            default:
-                throw new IllegalStateException("valami elbaszoódott xDD");
-        }
+        AgentTool tool = toolRegistry.getTool(toolName);
+
+        Object result = tool.execute(arguments);
+        messageService.createAndSaveToolMessage(uuid, toolName, result);
 
     }
 

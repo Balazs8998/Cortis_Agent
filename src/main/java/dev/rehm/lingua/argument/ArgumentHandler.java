@@ -54,12 +54,12 @@ public class ArgumentHandler {
         if (toolRegistry != null
                 && toolRegistry.getToolregistry() != null
                 && toolRegistry.getToolregistry().get(toolName) != null
-                && toolRegistry.getToolregistry().get(toolName).parameters() != null
-                && toolRegistry.getToolregistry().get(toolName).parameters().properties() != null
-                && !toolRegistry.getToolregistry().get(toolName).parameters().properties().isEmpty()
-                && toolRegistry.getToolregistry().get(toolName).parameters().properties().get(argumentName) != null) {
+                && toolRegistry.getToolregistry().get(toolName).definition().parameters() != null
+                && toolRegistry.getToolregistry().get(toolName).definition().parameters().properties() != null
+                && !toolRegistry.getToolregistry().get(toolName).definition().parameters().properties().isEmpty()
+                && toolRegistry.getToolregistry().get(toolName).definition().parameters().properties().get(argumentName) != null) {
 
-            properties = toolRegistry.getToolregistry().get(toolName).parameters().properties().get(argumentName);
+            properties = toolRegistry.getToolregistry().get(toolName).definition().parameters().properties().get(argumentName);
         }
         if(properties == null){
             throw new ArgumentValidationException(toolName,"ToolRegistry/Properties", null,

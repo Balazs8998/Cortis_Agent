@@ -7,6 +7,7 @@ import dev.rehm.lingua.dto.request.RequestTool;
 import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
 import dev.rehm.lingua.registry.ToolRegistry;
 import dev.rehm.lingua.service.MessageService;
+import dev.rehm.lingua.tool.AgentTool;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Component;
 
@@ -44,12 +45,11 @@ public class RequestFactory {
     }
 
     private @NotNull List<RequestTool> createRequestTools() {
-        toolRegistry.loadToolRegistry();
-        Map<String, ToolRequestFunction> toolRequestFunctionMap = Map.copyOf(toolRegistry.getToolregistry());
+        Map<String, AgentTool> toolRequestFunctionMap = Map.copyOf(toolRegistry.getToolregistry());
         List<RequestTool> requestTools = new ArrayList<>();
 
-        for (Map.Entry<String, ToolRequestFunction> entry : toolRequestFunctionMap.entrySet()) {
-            requestTools.add(new RequestTool("function", entry.getValue()));
+        for (Map.Entry<String, AgentTool> entry : toolRequestFunctionMap.entrySet()) {
+            requestTools.add(new RequestTool("function", entry.getValue().definition()));
         }
 
         return requestTools;

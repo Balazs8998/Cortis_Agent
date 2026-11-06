@@ -3,6 +3,7 @@ package dev.rehm.lingua.registry;
 import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
 import dev.rehm.lingua.dto.request.tool.ToolRequestParameters;
 import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
+import dev.rehm.lingua.tool.AgentTool;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,41 +14,26 @@ import java.util.Map;
 @Component
 public class ToolRegistry {
 
-    private final Map<String, ToolRequestFunction> toolregistry = new HashMap<>();
+    private final Map<String, AgentTool> toolregistry = new HashMap<>();
 
 
-
-    public void loadToolRegistry(){
-
-        ToolRequestProperties calculatorAddPropertiesA = new ToolRequestProperties(
-                "number",
-                "Szám amihez hozzáadjuk a második számot.");
-
-        ToolRequestProperties calculatorAddPropertiesB = new ToolRequestProperties(
-                "number",
-                "Szám amit hozzáadunk az első számhoz");
-
-        ToolRequestParameters calculatorAddParameters = new ToolRequestParameters(
-                "object",
-                new HashMap<>(Map.of("a", calculatorAddPropertiesA,"b",calculatorAddPropertiesB)),
-                new ArrayList<>(List.of("a","b"))
-        );
-
-        ToolRequestFunction calculatorAddFunction = new ToolRequestFunction(
-                "add",
-                "Az a és b paraméterek összeadását végzi el.",
-                calculatorAddParameters);
-
-        toolregistry.put("add",calculatorAddFunction);
+    public ToolRegistry(List<AgentTool> tools) {
+        for (AgentTool tool : tools) {
+            toolregistry.put(tool.definition().name(), tool);
+        }
     }
 
     public ToolRequestFunction getToolFunction(String toolName){
 
-        return toolregistry.get(toolName);
+        return toolregistry.get(toolName).definition();
 
     }
 
-    public Map<String, ToolRequestFunction> getToolregistry() {
+    public AgentTool getTool(String toolName){
+        return toolregistry.get(toolName);
+    }
+
+    public Map<String, AgentTool> getToolregistry() {
 
         return toolregistry;
     }
