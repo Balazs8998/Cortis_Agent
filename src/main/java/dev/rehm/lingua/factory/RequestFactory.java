@@ -4,7 +4,6 @@ import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.request.RequestOption;
 import dev.rehm.lingua.dto.request.RequestTool;
-import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
 import dev.rehm.lingua.registry.ToolRegistry;
 import dev.rehm.lingua.service.MessageService;
 import dev.rehm.lingua.tool.AgentTool;
