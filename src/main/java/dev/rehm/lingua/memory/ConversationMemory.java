@@ -5,6 +5,8 @@ import dev.rehm.lingua.dto.OllamaMessageDto;
 import org.springframework.stereotype.Component;
 
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +28,14 @@ public class ConversationMemory {
         messageMap.get(uuid).addMessage(message);
     }
 
+    public List<OllamaMessageDto> getMessageList(UUID uuid){
+        ConversationMessage conversationMessage = messageMap.get(uuid);
+
+
+
+        return new ArrayList<>(conversationMessage.getMessages());
+
+    }
     public Map<UUID, ConversationMessage> getMessageMap() {
         return Map.copyOf(messageMap);
     }
