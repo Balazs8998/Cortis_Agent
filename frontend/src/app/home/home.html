@@ -1,58 +1,22 @@
-
-<main class="home-shell">
-
-  <header class="home-header">
-    <div class="logo">C</div>
-    <span class="brand">CORTIS</span>
-    <span class="version">AI AGENT</span>
-  </header>
-
-  <section class="hero">
-
-    <div class="hero-icon">C</div>
-
-    <p class="eyebrow">
-      INTELLIGENT AGENT SYSTEM
+<main class="landing">
+  <header><span class="brand">◈ CORTIS</span><span>AGENT WORKSPACE / 01</span></header>
+  <section>
+    <p class="eyebrow">LOCAL INTELLIGENCE. OPEN INSPECTION.</p>
+    <div class="symbol">✳</div>
+    <h1>A conversation.<br /><span>A clearer view.</span></h1>
+    <p class="intro">
+      Beszélgess az agenteddel, és kövesd a kérések útját.<br />Chat és inspector. Egyetlen,
+      szabadon rendezhető munkafelület.
     </p>
-
-    <h1>
-      Welcome to <span>CORTIS</span>
-    </h1>
-
-    <p class="description">
-      Your intelligent assistant, powered by local AI.
-      Start a new conversation to get started.
-    </p>
-
-    <button
-      class="new-chat-button"
-      type="button"
-      (click)="createNewChat()"
-      [disabled]="isLoading()"
-    >
-      @if (isLoading()) {
-        Creating conversation...
-      } @else {
-        <span class="plus">+</span>
-        New Chat
-      }
+    <button (click)="createNewChat()" [disabled]="isLoading()">
+      {{ isLoading() ? 'Kapcsolódás…' : 'Munkafelület megnyitása ↗' }}
     </button>
-
     @if (errorMessage()) {
-      <p class="error-message" role="alert">
-        {{ errorMessage() }}
-      </p>
+      <p class="error" role="alert">{{ errorMessage() }}</p>
     }
-
-    <p class="helper-text">
-      A new conversation will be created.
-    </p>
-
+    <div class="features">
+      <span>01 / CHAT</span><span>02 / INSPECT</span><span>03 / TRACE</span>
+    </div>
   </section>
-
-  <footer class="home-footer">
-    <span>CORTIS AI AGENT</span>
-    <span>Developed by Balázs Rehm</span>
-  </footer>
-
+  <footer><span>CORTIS DEVELOPER CONSOLE</span><span>BY BALÁZS REHM</span></footer>
 </main>

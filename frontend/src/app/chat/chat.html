@@ -1,83 +1,382 @@
-
-<main class="chat-shell" aria-label="CORTIS AI beszélgetés">
-  <header class="chat-header">
-
-    <button
-      class="back-button"
-      type="button"
-      (click)="backToHome()"
-      aria-label="Vissza a kezdőoldalra"
-      title="Back to Home"
-    >
-      ←
-    </button>
-
-    <div class="conversation-info">
-      <span>CONVERSATION</span>
-      <code>{{ conversationId().slice(0, 8) }}</code>
-    </div>
-
-
-    <div class="brand-icon" aria-hidden="true">C</div>
-    <div class="brand-copy">
-      <p class="eyebrow">CORTIS / INTELLIGENCE</p>
-      <h1>CORTIS <span>AI Agent</span></h1>
-    </div>
-    <div class="connection" aria-label="Helyi AI chat">
-      <span class="status-dot"></span> LOCAL
-    </div>
+<main class="console">
+  <header class="topbar">
+    <a class="brand" href="/" (click)="$event.preventDefault(); backToHome()"
+    ><span class="logo">C</span>CORTIS<span class="edition">/ AGENT WORKSPACE</span></a
+    ><span class="session">SESSION {{ conversationId().slice(0, 8) }}</span
+  ><span class="badge">{{ isLoading() ? '◌ REQUEST RUNNING' : '◇ STANDBY' }}</span>
   </header>
-
-  <section #messageList class="chat-content" aria-label="Üzenetek" aria-live="polite">
-    <div class="session-label"><span></span> BESZÉLGETÉS <span></span></div>
-
-    @for (item of messages(); track item.id) {
-      <article class="message" [class.user]="item.role === 'user'" [class.assistant]="item.role === 'assistant'">
-        @if (item.role === 'assistant') {
-          <div class="avatar" aria-hidden="true">C</div>
-        }
-        <div class="message-body">
-          <div class="message-meta">
-            @if (item.role === 'assistant') { CORTIS <span>· AI AGENT</span> }
-            @else { TE }
+  <div class="workspace-heading">
+    <div>
+      <p class="eyebrow">LOCAL INTELLIGENCE / DEVELOPER CONSOLE</p>
+      <h1>Inside the conversation<span>.</span></h1>
+    </div>
+    <button (click)="arrange()">⊞ Elrendezés visszaállítása</button>
+  </div>
+  <div class="desktop" #desktop>
+    <app-panel #chatPanel title="Agent chat" tag="01 / CONVERSATION">
+      <div class="chat-context">
+        <span class="agent-mark">C</span>
+        <div><strong>CORTIS Agent</strong><small>Saját agent. Közvetlen kapcsolat.</small></div>
+        <span class="pill">HTTP</span>
+      </div>
+      <div class="messages" #messageList aria-live="polite" [attr.aria-busy]="isLoading()">
+        @if (!messages().length) {
+          <div class="welcome">
+            <div class="orbit">✳</div>
+            <p class="eyebrow">READY WHEN YOU ARE</p>
+            <h2>Indítsunk egy gondolatot.</h2>
+            <p>A beszélgetés itt kezdődik.<br />A kérés útját a jobb oldalon követheted.</p>
+            <button class="suggestion" (click)="draft.set('Add össze a 24-et és a 18-at.')">
+              ↗ Add össze a 24-et és a 18-at.
+            </button>
           </div>
-          <div class="bubble">{{ item.content }}</div>
+        }
+        @for (m of messages(); track m.id) {
+          <article [class.user]="m.role === 'user'">
+            <div class="message-meta">
+              <b>{{ m.role === 'user' ? 'TE' : 'CORTIS' }}</b
+              ><time>{{ m.time | date: 'HH:mm:ss' }}</time>
+            </div>
+            <p>{{ m.content }}</p>
+            @if (m.failed) {
+              <small class="error">⚠ Nem érkezett válasz</small>
+            }
+          </article>
+        }
+        @if (isLoading()) {
+          <div class="thinking">◌ Az agent dolgozik…</div>
+        }
+      </div>
+      <div class="composer">
+        @if (errorMessage()) {
+          <p class="error" role="alert">{{ errorMessage() }}</p>
+        }
+        <div class="input-wrap">
+          <textarea
+            aria-label="Üzenet a CORTIS-nak"
+            placeholder="Írj a CORTIS-nak…"
+            [ngModel]="draft()"
+            (ngModelChange)="draft.set($event)"
+            (keydown)="onInputKeydown($event)"
+            rows="2"
+          ></textarea
+          ><button
+          class="send"
+          (click)="sendMessage()"
+          [disabled]="isLoading() || !draft().trim()"
+          aria-label="Üzenet küldése"
+        >
+          ↑
+        </button>
         </div>
-      </article>
-    }
-
-    @if (isLoading()) {
-      <article class="message assistant">
-        <div class="avatar" aria-hidden="true">C</div>
-        <div class="message-body">
-          <div class="message-meta">CORTIS <span>· AI AGENT</span></div>
-          <div class="bubble">Válasz generálása…</div>
+        <div class="composer-hint">
+          <span>ENTER küldés · SHIFT + ENTER új sor</span><span>LOCAL AGENT ↗</span>
         </div>
-      </article>
-    }
+      </div>
+    </app-panel>
+    <app-panel #inspectorPanel title="Agent inspector" tag="02 / OBSERVABILITY">
+      <div class="inspector-toolbar">
+        <div>
+          <span class="live-dot"></span> Browser trace
+          <span class="muted">/ {{ runs().length }} requests</span>
+        </div>
+        <button (click)="exportTrace()" [disabled]="!runs().length">↓ JSON</button>
+      </div>
+      <nav class="tabs" aria-label="Inspector nézetek">
+        @for (t of tabs; track t) {
+          <button
+            [class.active]="tab() === t"
+            [attr.aria-pressed]="tab() === t"
+            (click)="tab.set(t)"
+          >
+            {{ t }}
+          </button>
+        }
+      </nav>
+      <div class="inspector-content">
+        @if (runs().length) {
+          <label class="run-picker"
+          >REQUEST<select
+            aria-label="Vizsgált kérés"
+            [ngModel]="selectedId()"
+            (ngModelChange)="selectedId.set($event)"
+          >
+            @for (r of runs(); track r.id) {
+              <option [ngValue]="r.id">
+                #{{ r.id }} · {{ r.time | date: 'HH:mm:ss' }} · {{ r.status }}
+              </option>
+            }
+          </select></label
+          >
+        }
+        @switch (tab()) {
+          @case ('Overview') {
+            <div class="section-label">EXECUTION OVERVIEW <span>HTTP SCOPE</span></div>
+            <div class="metrics">
+              <div>
+                <small>REQUEST STATUS</small
+                ><strong [class.error]="selected()?.status === 'Failed'">{{
+                  selected()?.status ?? 'Ready'
+                }}</strong
+              ><span>{{
+                  selected() ? 'Böngészőben megfigyelt állapot' : 'Várakozás az első kérésre'
+                }}</span>
+              </div>
+              <div>
+                <small>ROUND TRIP</small
+                ><strong>{{ selected()?.duration ?? '—' }}<em>ms</em></strong
+              ><span>Teljes HTTP-válaszidő</span>
+              </div>
+              <div>
+                <small>REMAINING ITERATIONS</small><strong>{{selected()?.remainingIterations}}</strong>
+              </div>
+              <div>
+                <small>REMAINING TOOLS</small><strong>{{selected()?.remainingToolCalls}}</strong>
+              </div>
+              <div class="termination-reason">
+                <small>AGENT TERMINATION REASON</small>
+                <strong [class.error]="selected()?.response?.agentTerminationReason === 'ITERATION_LIMIT_REACHED' || selected()?.response?.agentTerminationReason === 'TOOL_LIMIT_REACHED'">
+                  {{ selected()?.response?.agentTerminationReason ?? '-' }}
+                </strong>
+                <span>Agent végrehajtásának lezárási oka</span>
+              </div>
+            </div>
+            <div class="section-label spaced">CONNECTION MAP</div>
+            <div class="connection">
+              <span>Browser</span><i>→</i><span>Spring agent</span><i>→</i><span>Ollama</span>
+            </div>
+            <div class="notice">
+              <b>◈ Agent execution telemetry</b>
+              <p>
+                A futás végén rendelkezésre állnak a
+                toolhívások, az eredmények és a budgetértékek.
+                A részleteket a Tools fülön vizsgálhatod.
+                A valós idejű eseménykövetés még nem aktív.
+              </p>
+            </div>
+            <details open>
+              <summary>
+                Diagnostics <span>{{ errorMessage() ? '1 issue' : 'HTTP only' }}</span>
+              </summary>
+              <p class="diagnostic">
+                {{
+                  errorMessage() ||
+                  'A HTTP-adatok és a futás végén visszaküldött tooladatok megtekinthetők.'
+                }}
+              </p>
+            </details>
+          }
+          @case ('Messages') {
+            <div class="section-label">
+              BROWSER CONVERSATION
+              <select
+                aria-label="Üzenetszerep szűrése"
+                [ngModel]="role()"
+                (ngModelChange)="role.set($event)"
+              >
+                <option value="all">All roles</option>
+                <option value="user">User</option>
+                <option value="assistant">Assistant</option>
+              </select>
+            </div>
+            <p class="muted">Csak az ezen az oldalon küldött és fogadott üzenetek.</p>
+            @for (m of filteredMessages(); track m.id) {
+              <details>
+                <summary>
+                  <span class="role">{{ m.role }}</span> #{{ m.id }} ·
+                  {{ m.time | date: 'HH:mm:ss' }}
+                </summary>
+                <pre>{{ m.content }}</pre>
+              </details>
+            } @empty {
+              <div class="empty">Még nincs megjeleníthető üzenet.</div>
+            }
+          }
+          @case ('Timeline') {
+            <div class="section-label">REQUEST TIMELINE</div>
+            @for (r of runs(); track r.id) {
+              <div class="timeline-item">
+                <small>{{ r.time | date: 'HH:mm:ss' }}</small
+                ><b>#{{ r.id }} · POST /api/ollama/chat</b
+              ><span>{{ r.status }} · {{ r.duration ?? '…' }} ms</span
+              ><button (click)="selectedId.set(r.id); tab.set('Raw')">Kérés részletei ↗</button>
+              </div>
+            } @empty {
+              <div class="empty">
+                Az első küldés után itt jelenik meg a kérés és annak eredménye.
+              </div>
+            }
+          }
+          @case ('Tools') {
+            <div class="section-label">
+              TOOL EXECUTION INSPECTOR
+              <span>AGENT TELEMETRY</span>
+            </div>
 
-    @if (errorMessage()) {
-      <p class="error-message" role="alert">{{ errorMessage() }}</p>
-    }
-  </section>
+            @if (selected(); as run) {
 
-  <footer class="composer-area">
-    <form class="composer" (ngSubmit)="sendMessage()">
-      <label for="message-input" class="sr-only">Üzenet</label>
-      <textarea
-        id="message-input"
-        name="message"
-        rows="1"
-        [ngModel]="draft()"
-        (ngModelChange)="draft.set($event)"
-        [disabled]="isLoading()"
-        (keydown)="onInputKeydown($event)"
-        placeholder="Írj egy üzenetet a CORTIS-nak..."
-      ></textarea>
-      <button class="send-button" type="submit" [disabled]="isLoading() || !draft().trim()" aria-label="Üzenet küldése" title="Küldés">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 14-7-5 14-2.8-6.2L5 12Z"/><path d="m11.2 12.8 4.3-4.3"/></svg>
-      </button>
-    </form>
-    <p class="composer-hint">ENTER: KÜLDÉS <span>·</span> SHIFT + ENTER: ÚJ SOR <span>·</span> CORTIS AI</p>
+              <div class="metrics">
+                <div>
+                  <small>TOOL CALLS</small>
+                  <strong>{{ run.response?.toolCalls ?? '—' }}</strong>
+                  <span>Total requested calls</span>
+                </div>
+
+                <div>
+                  <small>SUCCESSFUL</small>
+                  <strong>{{ run.response?.successful ?? '—' }}</strong>
+                  <span>Successful executions</span>
+                </div>
+
+                <div>
+                  <small>FAILED</small>
+                  <strong [class.error]="(run.response?.failed ?? 0) > 0">
+                    {{ run.response?.failed ?? '—' }}
+                  </strong>
+                  <span>Failed executions</span>
+                </div>
+
+                <div>
+                  <small>REMAINING TOOLS</small>
+                  <strong>{{ run.remainingToolCalls ?? '—' }}</strong>
+                  <span>Available tool budget</span>
+                </div>
+              </div>
+
+              <div class="section-label spaced">
+                EXECUTION HISTORY
+                <span>
+        {{ selectedToolExecutions().length }} ENTRIES
+      </span>
+              </div>
+
+              @for (tool of selectedToolExecutions(); track $index) {
+
+                <details class="tool-execution">
+
+                  <summary>
+          <span class="role">
+            #{{ $index + 1 }}
+          </span>
+
+                    <strong>{{ tool.toolName }}</strong>
+
+                    <span
+                      class="tool-status"
+                      [class.error]="tool.status === 'FAILED'"
+                    >
+            {{ tool.status }}
+          </span>
+                  </summary>
+
+                  <div class="tool-details">
+
+                    <div class="tool-metadata">
+                      <div>
+                        <small>EXECUTED AT</small>
+                        <strong>
+                          {{ tool.executedAt | date:'HH:mm:ss.SSS' }}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <small>DURATION</small>
+                        <strong>{{ tool.durationMs }} ms</strong>
+                      </div>
+
+                      <div>
+                        <small>STATUS</small>
+                        <strong
+                          [class.error]="tool.status === 'FAILED'"
+                        >
+                          {{ tool.status }}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div class="section-label spaced">
+                      ARGUMENTS
+                    </div>
+
+                    <pre>{{ tool.arguments | json }}</pre>
+
+                    <div class="section-label spaced">
+                      EXECUTION RESULT
+                    </div>
+
+                    <pre>{{ tool.result | json }}</pre>
+
+                  </div>
+
+                </details>
+
+              } @empty {
+
+                <div class="empty">
+                  <div class="orbit">⌘</div>
+                  <h2>No tool executions</h2>
+
+                  @if (run.status === 'Running') {
+                    <p>
+                      Az agent még dolgozik.
+                      A toolhívások a válasz beérkezésekor
+                      jelennek meg.
+                    </p>
+                  } @else {
+                    <p>
+                      Ehhez a futáshoz nem érkezett
+                      toolvégrehajtási adat.
+                    </p>
+                  }
+                </div>
+
+              }
+
+            } @else {
+
+              <div class="empty">
+                <div class="orbit">⌘</div>
+                <h2>Tool inspector</h2>
+                <p>
+                  Küldj egy üzenetet az agentnek
+                  a végrehajtási adatok megtekintéséhez.
+                </p>
+              </div>
+
+            }
+          }
+
+          @case ('Raw') {
+            <div class="section-label">HTTP PAYLOAD <span>POST /api/ollama/chat</span></div>
+            @if (selected(); as r) {
+              <details open>
+                <summary>Request JSON</summary>
+                <pre>{{ r.request | json }}</pre>
+              </details>
+              <details open>
+                <summary>{{ r.error ? 'Error' : 'Response JSON' }}</summary>
+                <pre>{{ r.error ?? r.response ?? 'Várakozás a válaszra…' | json }}</pre>
+              </details>
+            } @else {
+              <div class="empty">Küldj egy üzenetet a payload megtekintéséhez.</div>
+            }
+          }
+        }
+      </div>
+      <footer class="inspector-footer">
+        <span>◈ CLIENT-SIDE INSPECTION</span><span>TRACE / v1</span>
+      </footer>
+    </app-panel>
+  </div>
+  <footer class="dock">
+    <div>
+      <button (click)="chatPanel.restore()" [class.minimized]="chatPanel.minimized()">
+        ▣ Chat {{ chatPanel.minimized() ? '↥' : '' }}</button
+      ><button (click)="inspectorPanel.restore()" [class.minimized]="inspectorPanel.minimized()">
+      ⌘ Inspector {{ inspectorPanel.minimized() ? '↥' : '' }}
+    </button>
+    </div>
+    <span>Húzd a fejlécet · Méretezz a jobb alsó saroknál</span
+    ><span class="edition">CORTIS / WORKSPACE 01</span>
   </footer>
 </main>

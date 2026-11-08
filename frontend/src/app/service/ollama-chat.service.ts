@@ -1,4 +1,3 @@
-
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
@@ -8,12 +7,39 @@ interface ChatRequest {
   message: string;
 }
 
-interface ChatResponse {
+export interface ChatResponse {
   message: string;
+  remainingToolCalls: number;
+  remainingIterations: number;
+  toolExecutionResults: ToolExecutionResult[];
+  toolCalls: number;
+  successful: number;
+  failed: number;
+  agentTerminationReason: AgentTerminationReason;
 }
 
 interface CreateConversationResponse {
   id: string;
+}
+
+export type AgentTerminationReason =
+  | 'COMPLETED'
+  | 'ITERATION_LIMIT_REACHED'
+  | 'TOOL_LIMIT_REACHED';
+
+export type ToolExecutionStatus =
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'SKIPPED'
+  | 'REJECTED';
+
+export interface ToolExecutionResult {
+  toolName: string;
+  arguments: Record<string, unknown>;
+  result: unknown;
+  status: ToolExecutionStatus;
+  executedAt: string;
+  durationMs: number;
 }
 
 const UUID_PATTERN =
@@ -35,16 +61,13 @@ export class OllamaChatService {
   private readonly conversationUrl =
     '/api/ollama/conversations';
 
-
   createConversation(): Observable<string> {
-
     return this.http.post(
       this.conversationUrl,
       {},
       { responseType: 'text' }
     ).pipe(
       map(response => {
-
         const conversationId = response.trim();
 
         if (!isConversationId(conversationId)) {
@@ -56,12 +79,10 @@ export class OllamaChatService {
     );
   }
 
-
   sendMessage(
     conversationId: string,
     message: string
   ): Observable<ChatResponse> {
-
     const request: ChatRequest = {
       conversationId,
       message
