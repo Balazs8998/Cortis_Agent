@@ -19,7 +19,6 @@ import dev.rehm.lingua.tool.AgentTool;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -50,15 +49,11 @@ public class AgentService {
 
     public AgentExecutionResult executeAgentLoop(UUID uuid, String userMessage) {
 
-        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(3,3);
+        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(4,2);
 
         List<ToolExecutionResult> toolExecutionResultList = new ArrayList<>();
         boolean hasToolCalling = true;
         OllamaChatResponse response = null;
-
-        int toolCalls = 0;
-        int successful = 0;
-        int failed = 0;
 
         OllamaMessageDto newMessage = MessageFactory.createUserMessageDto(userMessage);
         messageService.saveMessages(uuid, newMessage);
@@ -84,33 +79,12 @@ public class AgentService {
                 messageService.saveMessages(uuid, response.message());
 
 
-                toolCalls = toolExecutionResultList.size();
-                for (ToolExecutionResult toolExecutionResult : toolExecutionResultList) {
-                    if (toolExecutionResult.status() == ToolExecutionStatus.SUCCES){
-                        successful += 1;
-                    }
-                    if (toolExecutionResult.status() == ToolExecutionStatus.FAILED
-                            || toolExecutionResult.status() == ToolExecutionStatus.SKIPPED
-                    || toolExecutionResult.status() == ToolExecutionStatus.REJECTED){
-                        failed += 1;
-                    }
-
-
-                }
-
                 ollamaService.soutMessageList(conversationService.getMessageList(uuid));
                 agentExecutionBudget.printLoopLimits();
                 System.out.println("-------end-----------");
-                return new AgentExecutionResult(
-                        response.message().content(),
-                        agentExecutionBudget.getRemainingToolCall(),
-                        agentExecutionBudget.getRemainingIterations(),
-                        toolExecutionResultList,
-                        toolCalls,
-                        successful,
-                        failed,
-                        AgentTerminationReason.ITERATION_LIMIT_REACHED
-                );
+
+
+                return createResponse(response,agentExecutionBudget,toolExecutionResultList,AgentTerminationReason.ITERATION_LIMIT_REACHED);
             }
 
             OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
@@ -137,46 +111,55 @@ public class AgentService {
         agentExecutionBudget.printLoopLimits();
         System.out.println("-------end-----------");
 
-        boolean hasSkipped = false;
-
-
-        toolCalls = toolExecutionResultList.size();
         for (ToolExecutionResult toolExecutionResult : toolExecutionResultList) {
+
+            if (toolExecutionResult.status() == ToolExecutionStatus.SKIPPED){
+
+                return createResponse(response,agentExecutionBudget,toolExecutionResultList, AgentTerminationReason.TOOL_LIMIT_REACHED);
+
+
+            }
+        }
+
+
+
+        return createResponse(response,agentExecutionBudget,toolExecutionResultList, AgentTerminationReason.COMPLETED);
+    }
+
+    private AgentExecutionResult createResponse(
+            OllamaChatResponse response,
+            AgentExecutionBudget budget,
+            List<ToolExecutionResult> executionResults,
+            AgentTerminationReason terminationReason
+    ) {
+
+        int successful = 0;
+        int failed = 0;
+
+
+        int toolCalls = executionResults.size();
+        for (ToolExecutionResult toolExecutionResult : executionResults) {
             if (toolExecutionResult.status() == ToolExecutionStatus.SUCCES){
                 successful += 1;
             }
-            if (toolExecutionResult.status() == ToolExecutionStatus.FAILED
-                    || toolExecutionResult.status() == ToolExecutionStatus.SKIPPED
-                    || toolExecutionResult.status() == ToolExecutionStatus.REJECTED){
+            if (toolExecutionResult.status() == ToolExecutionStatus.SKIPPED
+            || toolExecutionResult.status() == ToolExecutionStatus.FAILED
+            || toolExecutionResult.status() == ToolExecutionStatus.REJECTED){
                 failed += 1;
-                hasSkipped = true;
             }
 
         }
 
-        if (hasSkipped){
 
-            return new AgentExecutionResult(
-                    response.message().content(),
-                    agentExecutionBudget.getRemainingToolCall(),
-                    agentExecutionBudget.getRemainingIterations(),
-                    toolExecutionResultList,
-                    toolCalls,
-                    successful,
-                    failed,
-                    AgentTerminationReason.TOOL_LIMIT_REACHED
-            );
-
-        }
         return new AgentExecutionResult(
                 response.message().content(),
-                agentExecutionBudget.getRemainingToolCall(),
-                agentExecutionBudget.getRemainingIterations(),
-                toolExecutionResultList,
+                budget.getRemainingToolCall(),
+                budget.getRemainingIterations(),
+                executionResults,
                 toolCalls,
                 successful,
                 failed,
-                AgentTerminationReason.COMPLETED
+                terminationReason
         );
     }
 
