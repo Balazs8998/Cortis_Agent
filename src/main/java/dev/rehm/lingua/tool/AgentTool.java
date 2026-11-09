@@ -7,5 +7,5 @@ import java.util.Map;
 public interface AgentTool {
 
     ToolRequestFunction definition();
-    Object execute(Map<String, Object> arguments);
+    Object execute(AgentTool tool, Map<String, Object> arguments);
 }

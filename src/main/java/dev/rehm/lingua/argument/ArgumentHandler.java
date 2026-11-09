@@ -4,9 +4,9 @@ import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
 import dev.rehm.lingua.dto.request.tool.ToolRequestParameters;
 import dev.rehm.lingua.exception.classes.ArgumentValidationException;
 import dev.rehm.lingua.exception.classes.UnexpectedNullValueException;
+import dev.rehm.lingua.tool.AgentTool;
 import tools.jackson.databind.ObjectMapper;
 import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
-import dev.rehm.lingua.registry.ToolRegistry;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -15,15 +15,14 @@ import java.util.Map;
 @Component
 public class ArgumentHandler {
 
-    private final ToolRegistry toolRegistry;
+    
     private final ObjectMapper objectMapper;
 
-    public ArgumentHandler(ToolRegistry toolRegistry, ObjectMapper objectMapper) {
-        this.toolRegistry = toolRegistry;
+    public ArgumentHandler(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    public <T> T getArgument(String toolName, String argumentName, Object argumentValue, Class<T> targetType) {
+    public <T> T getArgument(AgentTool agentTool, String toolName, String argumentName, Object argumentValue, Class<T> targetType) {
 
         if (argumentValue == null) {
             throw new IllegalArgumentException(
@@ -43,7 +42,7 @@ public class ArgumentHandler {
             throw new IllegalArgumentException("Target type is missing or null. The operation ha been aborted.");
         }
 
-        if (!validateArgument(toolName, argumentName, argumentValue)) {
+        if (!validateArgument(agentTool, toolName, argumentName, argumentValue)) {
             throw new IllegalArgumentException(
                     "The argument does not meet the required conditions. The process has been aborted."
             );
@@ -52,19 +51,9 @@ public class ArgumentHandler {
         return convertArgument(argumentValue, targetType);
     }
 
-    private boolean validateArgument(String toolName, String argumentName, Object argumentValue) {
+    private boolean validateArgument(AgentTool agentTool,String toolName, String argumentName, Object argumentValue) {
 
-        if (toolRegistry == null) {
-            throw new UnexpectedNullValueException(
-                    "ArgumentHandler",
-                    "toolRegistry",
-                    null,
-                    "Tool registry is null. Unable to resolve the requested tool.",
-                    "TOOL_REGISTRY_NULL"
-            );
-        }
-
-        ToolRequestFunction toolFunction = toolRegistry.getToolFunction(toolName);
+        ToolRequestFunction toolFunction = agentTool.definition();
 
         if (toolFunction == null) {
             throw new UnexpectedNullValueException(

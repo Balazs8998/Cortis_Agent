@@ -214,7 +214,8 @@ public class AgentService {
 
         AgentTool tool = toolRegistry.getTool(toolName);
 
-        Object result = tool.execute(arguments);
+
+        Object result = tool.execute(tool,arguments);
         messageService.createAndSaveToolMessage(uuid, toolName, result);
 
         return result;

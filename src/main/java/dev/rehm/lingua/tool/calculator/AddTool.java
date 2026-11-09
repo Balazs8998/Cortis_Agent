@@ -1,5 +1,6 @@
 package dev.rehm.lingua.tool.calculator;
 
+import dev.rehm.lingua.argument.ArgumentHandler;
 import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
 import dev.rehm.lingua.dto.request.tool.ToolRequestParameters;
 import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
@@ -13,6 +14,12 @@ import java.util.Map;
 
 @Component
 public class AddTool implements AgentTool {
+
+    private final ArgumentHandler argumentHandler;
+
+    public AddTool(ArgumentHandler argumentHandler) {
+        this.argumentHandler = argumentHandler;
+    }
 
     @Override
     public ToolRequestFunction definition() {
@@ -41,9 +48,9 @@ public class AddTool implements AgentTool {
     }
 
     @Override
-    public Object execute(Map<String, Object> arguments) {
-        double a = ((Number) arguments.get("a")).doubleValue();
-        double b = ((Number) arguments.get("b")).doubleValue();
+    public Object execute(AgentTool agentTool,Map<String, Object> arguments) {
+        double a = argumentHandler.getArgument(agentTool,"add","b", arguments.get("b"),Double.class);
+        double b = argumentHandler.getArgument(agentTool,"add","a",arguments.get("a"),Double.class);
 
         return a + b;
     }

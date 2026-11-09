@@ -19,7 +19,7 @@ public class RequestFactory {
 
     private  final MessageService messageService;
     private final ToolRegistry toolRegistry;
-    private static final String model = "qwen3.5:4b";
+    private static final String model = "qwen3:8b";
 
     public RequestFactory(MessageService messageService, ToolRegistry toolRegistry) {
         this.messageService = messageService;
