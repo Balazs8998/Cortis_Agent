@@ -4,7 +4,6 @@ import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
 import dev.rehm.lingua.dto.request.tool.ToolRequestParameters;
 import dev.rehm.lingua.exception.classes.ArgumentValidationException;
 import dev.rehm.lingua.exception.classes.UnexpectedNullValueException;
-import dev.rehm.lingua.tool.AgentTool;
 import tools.jackson.databind.ObjectMapper;
 import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
 import org.springframework.stereotype.Component;
@@ -22,7 +21,7 @@ public class ArgumentHandler {
         this.objectMapper = objectMapper;
     }
 
-    public <T> T getArgument(AgentTool agentTool, String toolName, String argumentName, Object argumentValue, Class<T> targetType) {
+    public <T> T getArgument(ToolRequestFunction toolRequestFunction, String toolName, String argumentName, Object argumentValue, Class<T> targetType) {
 
         if (argumentValue == null) {
             throw new IllegalArgumentException(
@@ -42,7 +41,7 @@ public class ArgumentHandler {
             throw new IllegalArgumentException("Target type is missing or null. The operation ha been aborted.");
         }
 
-        if (!validateArgument(agentTool, toolName, argumentName, argumentValue)) {
+        if (!validateArgument(toolRequestFunction, toolName, argumentName, argumentValue)) {
             throw new IllegalArgumentException(
                     "The argument does not meet the required conditions. The process has been aborted."
             );
@@ -51,9 +50,8 @@ public class ArgumentHandler {
         return convertArgument(argumentValue, targetType);
     }
 
-    private boolean validateArgument(AgentTool agentTool,String toolName, String argumentName, Object argumentValue) {
+    private boolean validateArgument(ToolRequestFunction toolFunction ,String toolName, String argumentName, Object argumentValue) {
 
-        ToolRequestFunction toolFunction = agentTool.definition();
 
         if (toolFunction == null) {
             throw new UnexpectedNullValueException(
