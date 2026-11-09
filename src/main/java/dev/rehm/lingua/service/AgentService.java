@@ -3,6 +3,7 @@ package dev.rehm.lingua.service;
 import dev.rehm.lingua.argument.ArgumentHandler;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
+import dev.rehm.lingua.dto.response.ChatResponse;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
 import dev.rehm.lingua.dto.response.tool.ToolCallResponse;
 import dev.rehm.lingua.exception.classes.UnexpectedNullValueException;
@@ -28,29 +29,27 @@ public class AgentService {
 
     private final OllamaService ollamaService;
     private final MessageService messageService;
-    private final ConversationMemory memory;
-    private final ArgumentHandler argumentHandler;
+
     private final RequestFactory requestFactory;
     private final ToolRegistry toolRegistry;
     private final ConversationService conversationService;
 
 
-    public AgentService(MessageService messageService, ConversationMemory memory, ToolRegistry toolRegistry, OllamaService ollamaService, ArgumentHandler argumentHandler, RequestFactory requestFactory, ConversationService conversationService) {
+    public AgentService(MessageService messageService, ToolRegistry toolRegistry, OllamaService ollamaService, RequestFactory requestFactory, ConversationService conversationService) {
 
         this.messageService = messageService;
-        this.memory = memory;
 
         this.ollamaService = ollamaService;
-        this.argumentHandler = argumentHandler;
         this.requestFactory = requestFactory;
         this.toolRegistry = toolRegistry;
         this.conversationService = conversationService;
     }
 
+
+
     public AgentExecutionResult executeAgentLoop(UUID uuid, String userMessage) {
 
-        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(4,2);
-
+        AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(3,2);
         List<ToolExecutionResult> toolExecutionResultList = new ArrayList<>();
         boolean hasToolCalling = true;
         OllamaChatResponse response = null;
@@ -66,25 +65,7 @@ public class AgentService {
             List<OllamaMessageDto> messages = new ArrayList<>(conversationService.getMessageList(uuid));
 
             if (agentExecutionBudget.getRemainingIterations() <= 0) {
-
-                OllamaMessageDto iterationMessage =
-                        MessageFactory.createSystemMessageDto("Agent iteration limit reached. "
-                                + "Report confirmed results and identify incomplete tasks.");
-
-                 messages.add(iterationMessage);
-
-                OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
-
-                response = agentMessage(ollamaChatRequest);
-                messageService.saveMessages(uuid, response.message());
-
-
-                ollamaService.soutMessageList(conversationService.getMessageList(uuid));
-                agentExecutionBudget.printLoopLimits();
-                System.out.println("-------end-----------");
-
-
-                return createResponse(response,agentExecutionBudget,toolExecutionResultList,AgentTerminationReason.ITERATION_LIMIT_REACHED);
+            return finishAfterIterationLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget);
             }
 
             OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
@@ -98,14 +79,9 @@ public class AgentService {
             messageService.saveMessages(uuid, response.message());
             hasToolCalling = hasToolCalling(response);
 
-
-
             if (hasToolCalling) {
                 toolExecutionResultList.addAll(toolCallingProcess(uuid, response, agentExecutionBudget)) ;
             }
-
-
-
         }
         ollamaService.soutMessageList(conversationService.getMessageList(uuid));
         agentExecutionBudget.printLoopLimits();
@@ -114,53 +90,10 @@ public class AgentService {
         for (ToolExecutionResult toolExecutionResult : toolExecutionResultList) {
 
             if (toolExecutionResult.status() == ToolExecutionStatus.SKIPPED){
-
-                return createResponse(response,agentExecutionBudget,toolExecutionResultList, AgentTerminationReason.TOOL_LIMIT_REACHED);
-
-
+                return createExecutionResult(AgentTerminationReason.TOOL_LIMIT_REACHED,agentExecutionBudget,response,toolExecutionResultList);
             }
         }
-
-
-
-        return createResponse(response,agentExecutionBudget,toolExecutionResultList, AgentTerminationReason.COMPLETED);
-    }
-
-    private AgentExecutionResult createResponse(
-            OllamaChatResponse response,
-            AgentExecutionBudget budget,
-            List<ToolExecutionResult> executionResults,
-            AgentTerminationReason terminationReason
-    ) {
-
-        int successful = 0;
-        int failed = 0;
-
-
-        int toolCalls = executionResults.size();
-        for (ToolExecutionResult toolExecutionResult : executionResults) {
-            if (toolExecutionResult.status() == ToolExecutionStatus.SUCCES){
-                successful += 1;
-            }
-            if (toolExecutionResult.status() == ToolExecutionStatus.SKIPPED
-            || toolExecutionResult.status() == ToolExecutionStatus.FAILED
-            || toolExecutionResult.status() == ToolExecutionStatus.REJECTED){
-                failed += 1;
-            }
-
-        }
-
-
-        return new AgentExecutionResult(
-                response.message().content(),
-                budget.getRemainingToolCall(),
-                budget.getRemainingIterations(),
-                executionResults,
-                toolCalls,
-                successful,
-                failed,
-                terminationReason
-        );
+        return createExecutionResult(AgentTerminationReason.COMPLETED,agentExecutionBudget,response,toolExecutionResultList);
     }
 
     private OllamaChatResponse agentMessage(OllamaChatRequest request){
@@ -191,11 +124,64 @@ public class AgentService {
 
     }
 
+    private AgentExecutionResult finishAfterIterationLimit(UUID uuid, List<OllamaMessageDto> messages, List<ToolExecutionResult> toolExecutionResultList, AgentExecutionBudget agentExecutionBudget){
+        OllamaMessageDto iterationMessage =
+                MessageFactory.createSystemMessageDto("Agent iteration limit reached. "
+                        + "Report confirmed results and identify incomplete tasks.");
+
+        messages.add(iterationMessage);
+
+        OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
+
+        OllamaChatResponse response = agentMessage(ollamaChatRequest);
+        messageService.saveMessages(uuid, response.message());
+
+        ollamaService.soutMessageList(conversationService.getMessageList(uuid));
+        agentExecutionBudget.printLoopLimits();
+        System.out.println("-------end-----------");
+
+        return createExecutionResult(AgentTerminationReason.ITERATION_LIMIT_REACHED,agentExecutionBudget,response,toolExecutionResultList);
+    }
+
+    private AgentExecutionResult createExecutionResult(AgentTerminationReason agentTerminationReason, AgentExecutionBudget agentExecutionBudget, OllamaChatResponse response, List<ToolExecutionResult> toolExecutionResults){
+
+        int successful = 0;
+        int failed = 0;
+
+        int toolCalls = toolExecutionResults.size();
+        for (ToolExecutionResult toolExecutionResult : toolExecutionResults) {
+            if (toolExecutionResult.status() == ToolExecutionStatus.SUCCES){
+                successful += 1;
+            }
+            if (toolExecutionResult.status() == ToolExecutionStatus.FAILED
+                    || toolExecutionResult.status() == ToolExecutionStatus.SKIPPED
+                    || toolExecutionResult.status() == ToolExecutionStatus.REJECTED){
+                failed += 1;
+            }
+
+
+        }
+
+        return new AgentExecutionResult(
+                response.message().content(),
+                agentExecutionBudget.getRemainingToolCall(),
+                agentExecutionBudget.getRemainingIterations(),
+                toolExecutionResults,
+                toolCalls,
+                successful,
+                failed,
+                agentTerminationReason
+        );
+    }
+
+
+
     private Object choiceTool(UUID uuid,ToolCallResponse toolCallResponse) {
         String toolName = toolCallResponse.function().name();
         Map<String, Object> arguments = toolCallResponse.function().arguments();
 
         AgentTool tool = toolRegistry.getTool(toolName);
+
 
         Object result = tool.execute(arguments);
         messageService.createAndSaveToolMessage(uuid, toolName, result);
