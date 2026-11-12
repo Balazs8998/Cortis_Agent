@@ -32,7 +32,8 @@ export type ToolExecutionStatus =
   | 'SUCCES'
   | 'FAILED'
   | 'SKIPPED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'TIMEOUT';
 
 export interface ToolExecutionResult {
   toolName: string;

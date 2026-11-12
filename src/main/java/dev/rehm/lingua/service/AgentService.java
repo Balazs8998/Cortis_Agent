@@ -1,10 +1,10 @@
 package dev.rehm.lingua.service;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ExecutionException;
-import dev.rehm.lingua.service.ToolExecutorService;
+import java.util.concurrent.*;
+
+import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
@@ -152,7 +152,8 @@ public class AgentService {
             }
             if (toolExecutionResult.status() == ToolExecutionStatus.FAILED
                     || toolExecutionResult.status() == ToolExecutionStatus.SKIPPED
-                    || toolExecutionResult.status() == ToolExecutionStatus.REJECTED){
+                    || toolExecutionResult.status() == ToolExecutionStatus.REJECTED
+                    || toolExecutionResult.status() == ToolExecutionStatus.TIMEOUT){
                 failed += 1;
             }
 
@@ -189,24 +190,60 @@ public class AgentService {
             List<Future<ToolExecutionResult>> futures =
                     new ArrayList<>();
 
+            AtomicReferenceArray<Thread> toolThreads = new AtomicReferenceArray<>(approved);
+
             for (int i = 0; i < approved; i++) {
                 ToolCallResponse call = calls.get(i);
                 int index = i;
 
+
                 futures.add(
-                        executor.submit(() -> executorService.executeTool(call,index))
+                        executor.submit(() -> {
+                            toolThreads.set(index, Thread.currentThread());
+                            return executorService.executeTool(call, index);
+                        })
                 );
             }
 
             for (int i = 0; i < calls.size(); i++) {
-
+                long start = System.nanoTime();
                 ToolExecutionResult result;
 
                 if (i < approved) {
                     try {
-                        result = futures.get(i).get();
 
-                    } catch (InterruptedException e) {
+                        result = futures.get(i).get(5, TimeUnit.SECONDS);
+
+                    }catch (TimeoutException e){
+
+
+                        futures.get(i).cancel(true);
+
+                        ToolCallResponse call = calls.get(i);
+
+                        Thread workerThread = toolThreads.get(i);
+
+                        Long threadId = workerThread == null
+                                ? null
+                                : workerThread.threadId();
+
+                        boolean isVirtual = workerThread != null
+                                && workerThread.isVirtual();
+
+
+                        result = new ToolExecutionResult(
+                                call.function().name(),
+                                call.function().arguments(),
+                                "Tool execution timed out",
+                                ToolExecutionStatus.TIMEOUT,
+                                Instant.now(),
+                                (double) (System.nanoTime() - start) /1000000,
+                                threadId,
+                                isVirtual,
+                                i
+                        );
+
+                    }catch (InterruptedException e) {
                         futures.forEach(f -> f.cancel(true));
                         Thread.currentThread().interrupt();
                         throw new IllegalStateException(
