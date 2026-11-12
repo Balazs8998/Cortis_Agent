@@ -51,8 +51,29 @@ public class AddTool implements AgentTool {
 
     @Override
     public Object execute(Map<String, Object> arguments) {
+
+        System.out.printf(
+                "TOOL START | Thread: %s | Virtual: %s%n",
+                Thread.currentThread().threadId(),
+                Thread.currentThread().isVirtual()
+        );
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "Tool execution interrupted", e
+            );
+        }
+
         double b = argumentHandler.getArgument(definition(),"add","b", arguments.get("b"),Double.class);
         double a = argumentHandler.getArgument(definition(),"add","a",arguments.get("a"),Double.class);
+
+        System.out.printf(
+                "TOOL END   | Thread: %s%n",
+                Thread.currentThread().threadId()
+        );
 
         return a + b;
     }

@@ -31,8 +31,6 @@ public class ConversationMemory {
     public List<OllamaMessageDto> getMessageList(UUID uuid){
         ConversationMessage conversationMessage = messageMap.get(uuid);
 
-
-
         return new ArrayList<>(conversationMessage.getMessages());
 
     }

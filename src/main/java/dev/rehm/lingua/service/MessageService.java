@@ -4,6 +4,7 @@ import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.memory.ConversationMemory;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -194,11 +195,11 @@ public class MessageService {
 
 
     private final ConversationMemory memory;
-    private final ConversationService conversationService;
 
-    public MessageService(ConversationMemory memory, ConversationService conversationService) {
+
+    public MessageService(ConversationMemory memory) {
         this.memory = memory;
-        this.conversationService = conversationService;
+
     }
 
     public void saveMessages(UUID uuid, OllamaMessageDto message) {
@@ -229,6 +230,13 @@ public class MessageService {
     public OllamaMessageDto firstSystemMessage() {
         return new OllamaMessageDto("system", null, SYSTEM_PROMPT, null);
 
+    }
+
+    public void soutMessageList(List<OllamaMessageDto> messageDtos) {
+        for (OllamaMessageDto messageDto : messageDtos) {
+            System.out.println(messageDto);
+        }
+        System.out.println("------------------------------------");
     }
 
 

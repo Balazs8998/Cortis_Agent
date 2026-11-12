@@ -1,9 +1,12 @@
 package dev.rehm.lingua.service;
 
-import dev.rehm.lingua.argument.ArgumentHandler;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ExecutionException;
+import dev.rehm.lingua.service.ToolExecutorService;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
-import dev.rehm.lingua.dto.response.ChatResponse;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
 import dev.rehm.lingua.dto.response.tool.ToolCallResponse;
 import dev.rehm.lingua.exception.classes.UnexpectedNullValueException;
@@ -14,9 +17,6 @@ import dev.rehm.lingua.factory.RequestFactory;
 import dev.rehm.lingua.inspection.dto.AgentTerminationReason;
 import dev.rehm.lingua.inspection.dto.ToolExecutionResult;
 import dev.rehm.lingua.inspection.dto.ToolExecutionStatus;
-import dev.rehm.lingua.memory.ConversationMemory;
-import dev.rehm.lingua.registry.ToolRegistry;
-import dev.rehm.lingua.tool.AgentTool;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 
@@ -27,21 +27,20 @@ import java.util.*;
 @Service
 public class AgentService {
 
+    private final ToolExecutorService executorService;
     private final OllamaService ollamaService;
     private final MessageService messageService;
-
     private final RequestFactory requestFactory;
-    private final ToolRegistry toolRegistry;
     private final ConversationService conversationService;
 
 
-    public AgentService(MessageService messageService, ToolRegistry toolRegistry, OllamaService ollamaService, RequestFactory requestFactory, ConversationService conversationService) {
+    public AgentService(MessageService messageService, ToolExecutorService executorService, OllamaService ollamaService, RequestFactory requestFactory, ConversationService conversationService) {
 
         this.messageService = messageService;
-
+        this.executorService = executorService;
         this.ollamaService = ollamaService;
         this.requestFactory = requestFactory;
-        this.toolRegistry = toolRegistry;
+
         this.conversationService = conversationService;
     }
 
@@ -68,11 +67,9 @@ public class AgentService {
             return finishAfterIterationLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget);
             }
 
-            OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
-            OllamaChatRequest ollamaChatRequestWithTool = requestFactory.addToolsToRequest(ollamaChatRequest);
+            OllamaChatRequest ollamaChatRequestWithTool = requestFactory.createRequestWithTool(messages);
 
-            agentExecutionBudget.decrementRemainingIterations();
-            agentExecutionBudget.incrementIterations();
+            agentExecutionBudget.loopStep();
 
             response = agentMessage(ollamaChatRequestWithTool);
 
@@ -83,7 +80,7 @@ public class AgentService {
                 toolExecutionResultList.addAll(toolCallingProcess(uuid, response, agentExecutionBudget)) ;
             }
         }
-        ollamaService.soutMessageList(conversationService.getMessageList(uuid));
+        messageService.soutMessageList(conversationService.getMessageList(uuid));
         agentExecutionBudget.printLoopLimits();
         System.out.println("-------end-----------");
 
@@ -136,7 +133,7 @@ public class AgentService {
         OllamaChatResponse response = agentMessage(ollamaChatRequest);
         messageService.saveMessages(uuid, response.message());
 
-        ollamaService.soutMessageList(conversationService.getMessageList(uuid));
+        messageService.soutMessageList(conversationService.getMessageList(uuid));
         agentExecutionBudget.printLoopLimits();
         System.out.println("-------end-----------");
 
@@ -174,72 +171,81 @@ public class AgentService {
         );
     }
 
-
-
-    private Object choiceTool(UUID uuid,ToolCallResponse toolCallResponse) {
-        String toolName = toolCallResponse.function().name();
-        Map<String, Object> arguments = toolCallResponse.function().arguments();
-
-        AgentTool tool = toolRegistry.getTool(toolName);
-
-
-        Object result = tool.execute(arguments);
-        messageService.createAndSaveToolMessage(uuid, toolName, result);
-
-        return result;
-
-    }
-
     private List<ToolExecutionResult> toolCallingProcess(
             UUID uuid,
             OllamaChatResponse response,
             AgentExecutionBudget budget
     ) {
+        List<ToolCallResponse> calls =
+                response.message().toolCalls();
+
+        int approved = budget.reserveBudget(calls.size());
+
         List<ToolExecutionResult> results = new ArrayList<>();
 
-        for (ToolCallResponse toolCall : response.message().toolCalls()) {
+        try (ExecutorService executor =
+                     Executors.newVirtualThreadPerTaskExecutor()) {
 
-            String toolName = toolCall.function().name();
-            Map<String, Object> arguments =
-                    new HashMap<>(toolCall.function().arguments());
+            List<Future<ToolExecutionResult>> futures =
+                    new ArrayList<>();
 
-            Instant executedAt = Instant.now();
-            long start = System.nanoTime();
+            for (int i = 0; i < approved; i++) {
+                ToolCallResponse call = calls.get(i);
+                int index = i;
 
-            if (budget.getRemainingToolCall() <= 0) {
-
-                messageService.saveToolCallLimitExceededMessage(uuid, toolName);
-
-                double durationMs =
-                        (System.nanoTime() - start) / 1_000_000.0;
-
-                results.add(new ToolExecutionResult(
-                        toolName,
-                        arguments,
-                        "Tool execution denied: limit reached",
-                        ToolExecutionStatus.SKIPPED,
-                        executedAt,
-                        durationMs
-                ));
-
-                continue;
+                futures.add(
+                        executor.submit(() -> executorService.executeTool(call,index))
+                );
             }
 
-            Object result = choiceTool(uuid, toolCall);
+            for (int i = 0; i < calls.size(); i++) {
 
-            budget.decrementRemainingTools();
+                ToolExecutionResult result;
 
-            double durationMs =
-                    (System.nanoTime() - start) / 1_000_000.0;
+                if (i < approved) {
+                    try {
+                        result = futures.get(i).get();
 
-            results.add(new ToolExecutionResult(
-                    toolName,
-                    arguments,
-                    result,
-                    ToolExecutionStatus.SUCCES,
-                    executedAt,
-                    durationMs
-            ));
+                    } catch (InterruptedException e) {
+                        futures.forEach(f -> f.cancel(true));
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(
+                                "Tool execution interrupted", e
+                        );
+
+                    } catch (ExecutionException e) {
+                        throw new IllegalStateException(
+                                "Unexpected tool execution failure",
+                                e.getCause()
+                        );
+                    }
+
+                } else {
+                    ToolCallResponse call = calls.get(i);
+
+                    result = new ToolExecutionResult(
+                            call.function().name(),
+                            call.function().arguments(),
+                            "Tool limit reached",
+                            ToolExecutionStatus.SKIPPED,
+                            Instant.now(),
+                            0,
+                            null,
+                            false,
+                          i
+                    );
+                }
+
+                results.add(result);
+
+                messageService.createAndSaveToolMessage(
+                        uuid,
+                        result.toolName(),
+                        result.status() == ToolExecutionStatus.SUCCES
+                                ? result.result()
+                                : result.status() + ": " + result.result()
+                );
+            }
         }
 
         return results;
