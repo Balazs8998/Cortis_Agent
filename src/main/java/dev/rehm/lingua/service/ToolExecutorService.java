@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 @Service
 public class ToolExecutorService {
@@ -37,11 +38,7 @@ public class ToolExecutorService {
         return tool.execute(arguments);
     }
 
-    public ToolExecutionResult executeTool(ToolCallResponse toolCall, int index) {
-
-
-
-        Instant executedAt = Instant.now();
+    public ToolExecutionResult executeTool(ToolCallResponse toolCall, int index, Instant executedAt) {
         long start = System.nanoTime();
 
         String toolName = toolCall.function().name();

@@ -2,6 +2,7 @@ package dev.rehm.lingua.service;
 
 import java.util.concurrent.*;
 
+import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -212,38 +213,90 @@ public class AgentService {
 
         List<ToolExecutionResult> results = new ArrayList<>();
 
-        try (ExecutorService executor =
-                     Executors.newVirtualThreadPerTaskExecutor()) {
+
+        ExecutorService executor =
+                Executors.newVirtualThreadPerTaskExecutor();
+
+        try{
+
+            long[] deadlinesNanos =
+                    new long[approved];
 
             List<Future<ToolExecutionResult>> futures =
                     new ArrayList<>();
 
-            AtomicReferenceArray<Thread> toolThreads = new AtomicReferenceArray<>(approved);
+            AtomicReferenceArray<Instant> toolStartedAt =
+                    new AtomicReferenceArray<>(approved);
+
+            AtomicLongArray finishedAtNanos =
+                    new AtomicLongArray(approved);
+
+            AtomicReferenceArray<Thread> toolThreads =
+                    new AtomicReferenceArray<>(approved);
 
             for (int i = 0; i < approved; i++) {
                 ToolCallResponse call = calls.get(i);
                 int index = i;
 
+                deadlinesNanos[i] = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
 
                 futures.add(
                         executor.submit(() -> {
                             toolThreads.set(index, Thread.currentThread());
-                            return executorService.executeTool(call, index);
+                            Instant startedAt = Instant.now();
+                            toolStartedAt.set(index, startedAt);
+
+
+                            try {
+                                return executorService.executeTool(call, index,startedAt);
+                            } finally {
+                                finishedAtNanos.set(index, System.nanoTime());
+                            }
                         })
                 );
             }
 
             for (int i = 0; i < calls.size(); i++) {
-                long start = System.nanoTime();
+
                 ToolExecutionResult result;
 
                 if (i < approved) {
                     try {
 
-                        result = futures.get(i).get(5, TimeUnit.SECONDS);
+                        long remainingNanos =
+                                deadlinesNanos[i] - System.nanoTime();
+
+
+                        result = futures.get(i).get(
+                                Math.max(0, remainingNanos),
+                                TimeUnit.NANOSECONDS
+                        );
+
+                        if (finishedAtNanos.get(i) - deadlinesNanos[i] > 0) {
+                            throw new TimeoutException(
+                                    "Tool completed after deadline"
+                            );
+                        }
 
                     }catch (TimeoutException e){
 
+                        long startNanos =
+                                deadlinesNanos[i] - TimeUnit.SECONDS.toNanos(5);
+
+                        long finishedNanos = finishedAtNanos.get(i);
+
+                        long endNanos = finishedNanos != 0L
+                                ? finishedNanos
+                                : Math.min(System.nanoTime(), deadlinesNanos[i]);
+
+                        double durationMs =
+                                Math.max(0L, endNanos - startNanos) / 1_000_000.0;
+
+                        Instant executedAt = toolStartedAt.get(i);
+
+                        if (executedAt == null) {
+                            executedAt = Instant.now();
+                        }
 
                         futures.get(i).cancel(true);
 
@@ -264,8 +317,8 @@ public class AgentService {
                                 call.function().arguments(),
                                 "Tool execution timed out",
                                 ToolExecutionStatus.TIMEOUT,
-                                Instant.now(),
-                                (double) (System.nanoTime() - start) /1000000,
+                                executedAt,
+                                durationMs,
                                 threadId,
                                 isVirtual,
                                 i
@@ -311,6 +364,8 @@ public class AgentService {
                                 : result.status() + ": " + result.result()
                 );
             }
+        }finally {
+            executor.shutdownNow();
         }
 
         return results;

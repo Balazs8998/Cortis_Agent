@@ -58,14 +58,15 @@ public class AddTool implements AgentTool {
                 Thread.currentThread().isVirtual()
         );
 
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(
-                    "Tool execution interrupted", e
-            );
-        }
+    try {
+    Number a = (Number) arguments.get("a");
+
+    Thread.sleep(a.intValue() == 5 ? 8000L : 2000L);
+
+} catch (InterruptedException e) {
+    Thread.currentThread().interrupt();
+    throw new IllegalStateException("Tool interrupted", e);
+}
 
 //        if (arguments.get("a").equals(5)){
 //        try {
