@@ -29,9 +29,11 @@ export type AgentTerminationReason =
 
 export type ToolExecutionStatus =
   | 'SUCCESS'
+  | 'SUCCES'
   | 'FAILED'
   | 'SKIPPED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'TIMEOUT';
 
 export interface ToolExecutionResult {
   toolName: string;
@@ -40,6 +42,9 @@ export interface ToolExecutionResult {
   status: ToolExecutionStatus;
   executedAt: string;
   durationMs: number;
+  startThreadId: number | null;
+  startIsVirtual: boolean;
+  toolCallIndex: number | null;
 }
 
 const UUID_PATTERN =

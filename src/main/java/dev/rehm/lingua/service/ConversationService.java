@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Component
 public class ConversationService {
@@ -27,5 +28,14 @@ public class ConversationService {
 
     public List<OllamaMessageDto> getMessageList(UUID uuid){
         return memory.getMessageList(uuid);
+    }
+
+    public <T> T executeSerialized(
+            UUID uuid,
+            Supplier<T> action
+    ) {
+        return memory
+                .getConversation(uuid)
+                .executeSerialized(action);
     }
 }

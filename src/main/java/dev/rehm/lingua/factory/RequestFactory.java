@@ -34,16 +34,24 @@ public class RequestFactory {
         messageDtos.addAll(messages);
         RequestOption options = new RequestOption(8192, 4096, 0.2, 0.9, 0.3, 40, 1.1);
 
-        return new OllamaChatRequest(model, messageDtos, new ArrayList<>(), null, options, false, false, -1);
+        return new OllamaChatRequest(model, messageDtos, new ArrayList<>(), null, options, false, true, -1);
+    }
+
+    public  @NotNull OllamaChatRequest createRequestWithTool(List<OllamaMessageDto> messages) {
+        OllamaChatRequest request =createBaseRequest(messages);
+        request.tools().addAll(findToolsToRequest());
+
+        return request;
+
     }
 
     public  @NotNull OllamaChatRequest addToolsToRequest(OllamaChatRequest request) {
-        request.tools().addAll(createRequestTools());
+        request.tools().addAll(findToolsToRequest());
 
         return request;
     }
 
-    private @NotNull List<RequestTool> createRequestTools() {
+    private @NotNull List<RequestTool> findToolsToRequest() {
         Map<String, AgentTool> toolRequestFunctionMap = Map.copyOf(toolRegistry.getToolregistry());
         List<RequestTool> requestTools = new ArrayList<>();
 

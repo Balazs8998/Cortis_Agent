@@ -10,6 +10,11 @@ public record ToolExecutionResult(
         Object result,
         ToolExecutionStatus status,
         Instant executedAt,
-        double durationMs
+        double durationMs,
+        Long startThreadId,
+        boolean startIsVirtual,
+        Integer toolCallIndex
+
+
 ) {
 }

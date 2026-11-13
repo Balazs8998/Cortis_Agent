@@ -1,5 +1,7 @@
 package dev.rehm.lingua.execution;
 
+import dev.rehm.lingua.dto.response.OllamaChatResponse;
+
 public class AgentExecutionBudget {
 
     int remainingToolCall;
@@ -21,12 +23,36 @@ public class AgentExecutionBudget {
     public AgentExecutionBudget() {
     }
 
+    public void loopStep(){
+        decrementRemainingIterations();
+        incrementIterations();
+    }
+
+    public int reserveBudget(int requestedToolCalls) {
+        if (requestedToolCalls < 0) {
+            throw new IllegalArgumentException(
+                    "Requested tool calls cannot be negative"
+            );
+        }
+
+        int approved = Math.min(
+                requestedToolCalls,
+                remainingToolCall
+        );
+
+        remainingToolCall -= approved;
+
+        return approved;
+    }
+
     public void decrementRemainingTools(){
+        if (remainingToolCall> 0)
         this.remainingToolCall--;
     }
 
     public void decrementRemainingIterations(){
-        this.remainingIterations--;
+        if (remainingIterations > 0)
+            this.remainingIterations--;
     }
 
     public void incrementIterations(){

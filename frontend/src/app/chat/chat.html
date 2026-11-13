@@ -292,6 +292,21 @@
                           {{ tool.status }}
                         </strong>
                       </div>
+
+                      <div>
+                        <small>TOOL CALL INDEX</small>
+                        <strong>{{ tool.toolCallIndex ?? '—' }}</strong>
+                      </div>
+
+                      <div>
+                        <small>THREAD ID</small>
+                        <strong>{{ tool.startThreadId ?? '—' }}</strong>
+                      </div>
+
+                      <div>
+                        <small>VIRTUAL THREAD</small>
+                        <strong>{{ tool.startThreadId == null ? '—' : (tool.startIsVirtual ? 'Yes' : 'No') }}</strong>
+                      </div>
                     </div>
 
                     <div class="section-label spaced">

@@ -1,9 +1,15 @@
 package dev.rehm.lingua.service;
 
-import dev.rehm.lingua.argument.ArgumentHandler;
+import java.util.concurrent.*;
+
+import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import ch.qos.logback.core.spi.LogbackLock;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
-import dev.rehm.lingua.dto.response.ChatResponse;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
 import dev.rehm.lingua.dto.response.tool.ToolCallResponse;
 import dev.rehm.lingua.exception.classes.UnexpectedNullValueException;
@@ -14,9 +20,6 @@ import dev.rehm.lingua.factory.RequestFactory;
 import dev.rehm.lingua.inspection.dto.AgentTerminationReason;
 import dev.rehm.lingua.inspection.dto.ToolExecutionResult;
 import dev.rehm.lingua.inspection.dto.ToolExecutionStatus;
-import dev.rehm.lingua.memory.ConversationMemory;
-import dev.rehm.lingua.registry.ToolRegistry;
-import dev.rehm.lingua.tool.AgentTool;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 
@@ -27,28 +30,49 @@ import java.util.*;
 @Service
 public class AgentService {
 
+    private final ToolExecutorService executorService;
     private final OllamaService ollamaService;
     private final MessageService messageService;
-
     private final RequestFactory requestFactory;
-    private final ToolRegistry toolRegistry;
     private final ConversationService conversationService;
 
 
-    public AgentService(MessageService messageService, ToolRegistry toolRegistry, OllamaService ollamaService, RequestFactory requestFactory, ConversationService conversationService) {
+    public AgentService(MessageService messageService, ToolExecutorService executorService, OllamaService ollamaService, RequestFactory requestFactory, ConversationService conversationService) {
 
         this.messageService = messageService;
-
+        this.executorService = executorService;
         this.ollamaService = ollamaService;
         this.requestFactory = requestFactory;
-        this.toolRegistry = toolRegistry;
+
         this.conversationService = conversationService;
     }
 
+    public AgentExecutionResult executeAgentLoop(
+            UUID uuid,
+            String userMessage
+    ) {
 
+        logLock("WAITING",uuid);
 
-    public AgentExecutionResult executeAgentLoop(UUID uuid, String userMessage) {
+        return conversationService.executeSerialized(
+                uuid,
+                () -> {
+                    logLock("ACQUIRED",uuid);
 
+                    try{
+                      return runAgentLoop(uuid, userMessage);
+
+                    }finally {
+                        logLock("FINISHED", uuid);
+                    }
+                }
+        );
+    }
+
+    private AgentExecutionResult runAgentLoop(
+            UUID uuid,
+            String userMessage
+    ) {
         AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(3,2);
         List<ToolExecutionResult> toolExecutionResultList = new ArrayList<>();
         boolean hasToolCalling = true;
@@ -65,14 +89,12 @@ public class AgentService {
             List<OllamaMessageDto> messages = new ArrayList<>(conversationService.getMessageList(uuid));
 
             if (agentExecutionBudget.getRemainingIterations() <= 0) {
-            return finishAfterIterationLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget);
+                return finishAfterIterationLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget);
             }
 
-            OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages);
-            OllamaChatRequest ollamaChatRequestWithTool = requestFactory.addToolsToRequest(ollamaChatRequest);
+            OllamaChatRequest ollamaChatRequestWithTool = requestFactory.createRequestWithTool(messages);
 
-            agentExecutionBudget.decrementRemainingIterations();
-            agentExecutionBudget.incrementIterations();
+            agentExecutionBudget.loopStep();
 
             response = agentMessage(ollamaChatRequestWithTool);
 
@@ -83,7 +105,7 @@ public class AgentService {
                 toolExecutionResultList.addAll(toolCallingProcess(uuid, response, agentExecutionBudget)) ;
             }
         }
-        ollamaService.soutMessageList(conversationService.getMessageList(uuid));
+        messageService.soutMessageList(conversationService.getMessageList(uuid));
         agentExecutionBudget.printLoopLimits();
         System.out.println("-------end-----------");
 
@@ -93,8 +115,12 @@ public class AgentService {
                 return createExecutionResult(AgentTerminationReason.TOOL_LIMIT_REACHED,agentExecutionBudget,response,toolExecutionResultList);
             }
         }
+
+
         return createExecutionResult(AgentTerminationReason.COMPLETED,agentExecutionBudget,response,toolExecutionResultList);
     }
+
+
 
     private OllamaChatResponse agentMessage(OllamaChatRequest request){
 
@@ -136,7 +162,7 @@ public class AgentService {
         OllamaChatResponse response = agentMessage(ollamaChatRequest);
         messageService.saveMessages(uuid, response.message());
 
-        ollamaService.soutMessageList(conversationService.getMessageList(uuid));
+        messageService.soutMessageList(conversationService.getMessageList(uuid));
         agentExecutionBudget.printLoopLimits();
         System.out.println("-------end-----------");
 
@@ -155,7 +181,8 @@ public class AgentService {
             }
             if (toolExecutionResult.status() == ToolExecutionStatus.FAILED
                     || toolExecutionResult.status() == ToolExecutionStatus.SKIPPED
-                    || toolExecutionResult.status() == ToolExecutionStatus.REJECTED){
+                    || toolExecutionResult.status() == ToolExecutionStatus.REJECTED
+                    || toolExecutionResult.status() == ToolExecutionStatus.TIMEOUT){
                 failed += 1;
             }
 
@@ -174,72 +201,171 @@ public class AgentService {
         );
     }
 
-
-
-    private Object choiceTool(UUID uuid,ToolCallResponse toolCallResponse) {
-        String toolName = toolCallResponse.function().name();
-        Map<String, Object> arguments = toolCallResponse.function().arguments();
-
-        AgentTool tool = toolRegistry.getTool(toolName);
-
-
-        Object result = tool.execute(arguments);
-        messageService.createAndSaveToolMessage(uuid, toolName, result);
-
-        return result;
-
-    }
-
     private List<ToolExecutionResult> toolCallingProcess(
             UUID uuid,
             OllamaChatResponse response,
             AgentExecutionBudget budget
     ) {
+        List<ToolCallResponse> calls =
+                response.message().toolCalls();
+
+        int approved = budget.reserveBudget(calls.size());
+
         List<ToolExecutionResult> results = new ArrayList<>();
 
-        for (ToolCallResponse toolCall : response.message().toolCalls()) {
 
-            String toolName = toolCall.function().name();
-            Map<String, Object> arguments =
-                    new HashMap<>(toolCall.function().arguments());
+        ExecutorService executor =
+                Executors.newVirtualThreadPerTaskExecutor();
 
-            Instant executedAt = Instant.now();
-            long start = System.nanoTime();
+        try{
 
-            if (budget.getRemainingToolCall() <= 0) {
+            long[] deadlinesNanos =
+                    new long[approved];
 
-                messageService.saveToolCallLimitExceededMessage(uuid, toolName);
+            List<Future<ToolExecutionResult>> futures =
+                    new ArrayList<>();
 
-                double durationMs =
-                        (System.nanoTime() - start) / 1_000_000.0;
+            AtomicReferenceArray<Instant> toolStartedAt =
+                    new AtomicReferenceArray<>(approved);
 
-                results.add(new ToolExecutionResult(
-                        toolName,
-                        arguments,
-                        "Tool execution denied: limit reached",
-                        ToolExecutionStatus.SKIPPED,
-                        executedAt,
-                        durationMs
-                ));
+            AtomicLongArray finishedAtNanos =
+                    new AtomicLongArray(approved);
 
-                continue;
+            AtomicReferenceArray<Thread> toolThreads =
+                    new AtomicReferenceArray<>(approved);
+
+            for (int i = 0; i < approved; i++) {
+                ToolCallResponse call = calls.get(i);
+                int index = i;
+
+                deadlinesNanos[i] = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+
+                futures.add(
+                        executor.submit(() -> {
+                            toolThreads.set(index, Thread.currentThread());
+                            Instant startedAt = Instant.now();
+                            toolStartedAt.set(index, startedAt);
+
+
+                            try {
+                                return executorService.executeTool(call, index,startedAt);
+                            } finally {
+                                finishedAtNanos.set(index, System.nanoTime());
+                            }
+                        })
+                );
             }
 
-            Object result = choiceTool(uuid, toolCall);
+            for (int i = 0; i < calls.size(); i++) {
 
-            budget.decrementRemainingTools();
+                ToolExecutionResult result;
 
-            double durationMs =
-                    (System.nanoTime() - start) / 1_000_000.0;
+                if (i < approved) {
+                    try {
 
-            results.add(new ToolExecutionResult(
-                    toolName,
-                    arguments,
-                    result,
-                    ToolExecutionStatus.SUCCES,
-                    executedAt,
-                    durationMs
-            ));
+                        long remainingNanos =
+                                deadlinesNanos[i] - System.nanoTime();
+
+
+                        result = futures.get(i).get(
+                                Math.max(0, remainingNanos),
+                                TimeUnit.NANOSECONDS
+                        );
+
+                        if (finishedAtNanos.get(i) - deadlinesNanos[i] > 0) {
+                            throw new TimeoutException(
+                                    "Tool completed after deadline"
+                            );
+                        }
+
+                    }catch (TimeoutException e){
+
+                        long startNanos =
+                                deadlinesNanos[i] - TimeUnit.SECONDS.toNanos(5);
+
+                        long finishedNanos = finishedAtNanos.get(i);
+
+                        long endNanos = finishedNanos != 0L
+                                ? finishedNanos
+                                : Math.min(System.nanoTime(), deadlinesNanos[i]);
+
+                        double durationMs =
+                                Math.max(0L, endNanos - startNanos) / 1_000_000.0;
+
+                        Instant executedAt = toolStartedAt.get(i);
+
+                        if (executedAt == null) {
+                            executedAt = Instant.now();
+                        }
+
+                        futures.get(i).cancel(true);
+
+                        ToolCallResponse call = calls.get(i);
+
+                        Thread workerThread = toolThreads.get(i);
+
+                        Long threadId = workerThread == null
+                                ? null
+                                : workerThread.threadId();
+
+                        boolean isVirtual = workerThread != null
+                                && workerThread.isVirtual();
+
+
+                        result = new ToolExecutionResult(
+                                call.function().name(),
+                                call.function().arguments(),
+                                "Tool execution timed out",
+                                ToolExecutionStatus.TIMEOUT,
+                                executedAt,
+                                durationMs,
+                                threadId,
+                                isVirtual,
+                                i
+                        );
+
+                    }catch (InterruptedException e) {
+                        futures.forEach(f -> f.cancel(true));
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(
+                                "Tool execution interrupted", e
+                        );
+
+                    } catch (ExecutionException e) {
+                        throw new IllegalStateException(
+                                "Unexpected tool execution failure",
+                                e.getCause()
+                        );
+                    }
+
+                } else {
+                    ToolCallResponse call = calls.get(i);
+
+                    result = new ToolExecutionResult(
+                            call.function().name(),
+                            call.function().arguments(),
+                            "Tool limit reached",
+                            ToolExecutionStatus.SKIPPED,
+                            Instant.now(),
+                            0,
+                            null,
+                            false,
+                          i
+                    );
+                }
+
+                results.add(result);
+
+                messageService.createAndSaveToolMessage(
+                        uuid,
+                        result.toolName(),
+                        result.status() == ToolExecutionStatus.SUCCES
+                                ? result.result()
+                                : result.status() + ": " + result.result()
+                );
+            }
+        }finally {
+            executor.shutdownNow();
         }
 
         return results;
@@ -250,6 +376,16 @@ public class AgentService {
             return false;
         }
         return !response.message().toolCalls().isEmpty();
+    }
+
+    private void logLock(String status, UUID uuid) {
+        System.out.printf(
+                "%s | UUID: %s | Thread: %d | Time: %s%n",
+                status,
+                uuid,
+                Thread.currentThread().threadId(),
+                Instant.now()
+        );
     }
 
 }
