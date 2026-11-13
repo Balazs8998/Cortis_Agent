@@ -44,10 +44,20 @@ public class AgentService {
         this.conversationService = conversationService;
     }
 
+    public AgentExecutionResult executeAgentLoop(
+            UUID uuid,
+            String userMessage
+    ) {
+        return conversationService.executeSerialized(
+                uuid,
+                () -> runAgentLoop(uuid, userMessage)
+        );
+    }
 
-
-    public AgentExecutionResult executeAgentLoop(UUID uuid, String userMessage) {
-
+    private AgentExecutionResult runAgentLoop(
+            UUID uuid,
+            String userMessage
+    ) {
         AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(3,2);
         List<ToolExecutionResult> toolExecutionResultList = new ArrayList<>();
         boolean hasToolCalling = true;
@@ -64,7 +74,7 @@ public class AgentService {
             List<OllamaMessageDto> messages = new ArrayList<>(conversationService.getMessageList(uuid));
 
             if (agentExecutionBudget.getRemainingIterations() <= 0) {
-            return finishAfterIterationLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget);
+                return finishAfterIterationLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget);
             }
 
             OllamaChatRequest ollamaChatRequestWithTool = requestFactory.createRequestWithTool(messages);
@@ -92,6 +102,8 @@ public class AgentService {
         }
         return createExecutionResult(AgentTerminationReason.COMPLETED,agentExecutionBudget,response,toolExecutionResultList);
     }
+
+
 
     private OllamaChatResponse agentMessage(OllamaChatRequest request){
 

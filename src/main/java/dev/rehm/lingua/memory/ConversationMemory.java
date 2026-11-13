@@ -5,10 +5,7 @@ import dev.rehm.lingua.dto.OllamaMessageDto;
 import org.springframework.stereotype.Component;
 
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -20,20 +17,31 @@ public class ConversationMemory {
         this.messageMap = new ConcurrentHashMap<>();
     }
 
+    public ConversationMessage getConversation(UUID uuid) {
+
+        ConversationMessage conversation = messageMap.get(uuid);
+
+        if (conversation == null) {
+            throw new NoSuchElementException(
+                    "Conversation not found: " + uuid
+            );
+        }
+
+        return conversation;
+    }
+
     public void addNewChat(ConversationMessage message){
         messageMap.put(message.getUuid(),message);
     }
 
-    public void addMessageToChat(UUID uuid,OllamaMessageDto message){
-        messageMap.get(uuid).addMessage(message);
+    public void addMessageToChat(UUID uuid, OllamaMessageDto message) {
+        getConversation(uuid).addMessage(message);
     }
 
-    public List<OllamaMessageDto> getMessageList(UUID uuid){
-        ConversationMessage conversationMessage = messageMap.get(uuid);
-
-        return new ArrayList<>(conversationMessage.getMessages());
-
+    public List<OllamaMessageDto> getMessageList(UUID uuid) {
+        return getConversation(uuid).getMessages();
     }
+
     public Map<UUID, ConversationMessage> getMessageMap() {
         return Map.copyOf(messageMap);
     }
