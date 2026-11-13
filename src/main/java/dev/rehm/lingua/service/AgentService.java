@@ -5,6 +5,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import ch.qos.logback.core.spi.LogbackLock;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
@@ -48,9 +50,21 @@ public class AgentService {
             UUID uuid,
             String userMessage
     ) {
+
+        logLock("WAITING",uuid);
+
         return conversationService.executeSerialized(
                 uuid,
-                () -> runAgentLoop(uuid, userMessage)
+                () -> {
+                    logLock("ACQUIRED",uuid);
+
+                    try{
+                      return runAgentLoop(uuid, userMessage);
+
+                    }finally {
+                        logLock("FINISHED", uuid);
+                    }
+                }
         );
     }
 
@@ -100,6 +114,8 @@ public class AgentService {
                 return createExecutionResult(AgentTerminationReason.TOOL_LIMIT_REACHED,agentExecutionBudget,response,toolExecutionResultList);
             }
         }
+
+
         return createExecutionResult(AgentTerminationReason.COMPLETED,agentExecutionBudget,response,toolExecutionResultList);
     }
 
@@ -305,6 +321,16 @@ public class AgentService {
             return false;
         }
         return !response.message().toolCalls().isEmpty();
+    }
+
+    private void logLock(String status, UUID uuid) {
+        System.out.printf(
+                "%s | UUID: %s | Thread: %d | Time: %s%n",
+                status,
+                uuid,
+                Thread.currentThread().threadId(),
+                Instant.now()
+        );
     }
 
 }

@@ -67,24 +67,24 @@ public class AddTool implements AgentTool {
             );
         }
 
-        if (arguments.get("a").equals(5)){
-        try {
-            System.out.println("ADD TOOL: Starting 7s delay...");
-
-            Thread.sleep(7000);
-
-            System.out.println("ADD TOOL: Delay completed");
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-
-            System.out.println("ADD TOOL: INTERRUPTED!");
-
-            throw new IllegalStateException(
-                    "Tool execution was interrupted", e
-            );
-        }
-        }
+//        if (arguments.get("a").equals(5)){
+//        try {
+//            System.out.println("ADD TOOL: Starting 7s delay...");
+//
+//            Thread.sleep(7000);
+//
+//            System.out.println("ADD TOOL: Delay completed");
+//
+//        } catch (InterruptedException e) {
+//            Thread.currentThread().interrupt();
+//
+//            System.out.println("ADD TOOL: INTERRUPTED!");
+//
+//            throw new IllegalStateException(
+//                    "Tool execution was interrupted", e
+//            );
+//        }
+//        }
 
         double b = argumentHandler.getArgument(definition(),"add","b", arguments.get("b"),Double.class);
         double a = argumentHandler.getArgument(definition(),"add","a",arguments.get("a"),Double.class);
