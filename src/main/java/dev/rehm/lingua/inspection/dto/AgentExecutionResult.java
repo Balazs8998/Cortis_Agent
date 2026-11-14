@@ -3,6 +3,7 @@ package dev.rehm.lingua.inspection.dto;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
 
 import java.util.List;
+import java.util.Set;
 
 public record AgentExecutionResult(
 
@@ -13,7 +14,8 @@ public record AgentExecutionResult(
         int toolCalls,
         int successful,
         int failed,
-        AgentTerminationReason agentTerminationReason
+        AgentTerminationReason agentTerminationReason,
+        Set<AgentResponseIssue> agentResponseIssues
 
 ) {
 }

@@ -1,10 +1,12 @@
 package dev.rehm.lingua.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.rehm.lingua.inspection.dto.AgentResponseIssue;
 import dev.rehm.lingua.inspection.dto.AgentTerminationReason;
 import dev.rehm.lingua.inspection.dto.ToolExecutionResult;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public record ChatResponse(
@@ -17,6 +19,7 @@ public record ChatResponse(
         int successful,
         int failed,
         AgentTerminationReason agentTerminationReason,
+        Set<AgentResponseIssue> agentResponseIssues,
         String doneReason
 ) {
 }

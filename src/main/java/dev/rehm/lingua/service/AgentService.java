@@ -14,12 +14,9 @@ import dev.rehm.lingua.dto.response.OllamaChatResponse;
 import dev.rehm.lingua.dto.response.tool.ToolCallResponse;
 import dev.rehm.lingua.exception.classes.UnexpectedNullValueException;
 import dev.rehm.lingua.execution.AgentExecutionBudget;
-import dev.rehm.lingua.inspection.dto.AgentExecutionResult;
+import dev.rehm.lingua.inspection.dto.*;
 import dev.rehm.lingua.factory.MessageFactory;
 import dev.rehm.lingua.factory.RequestFactory;
-import dev.rehm.lingua.inspection.dto.AgentTerminationReason;
-import dev.rehm.lingua.inspection.dto.ToolExecutionResult;
-import dev.rehm.lingua.inspection.dto.ToolExecutionStatus;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 
@@ -139,8 +136,6 @@ public class AgentService {
         System.out.println("-------end-----------");
 
 
-
-
         return createExecutionResult(AgentTerminationReason.COMPLETED,agentExecutionBudget,response,toolExecutionResultList);
     }
 
@@ -230,6 +225,18 @@ public class AgentService {
 
         }
 
+        Set<AgentResponseIssue> issues =
+                EnumSet.noneOf(AgentResponseIssue.class);
+
+        if ("length".equals(response.doneReason())) {
+            issues.add(AgentResponseIssue.MODEL_OUTPUT_TRUNCATED);
+        }
+
+        if (response.message().content() == null
+                || response.message().content().isBlank()) {
+            issues.add(AgentResponseIssue.MODEL_RESPONSE_EMPTY);
+        }
+
         return new AgentExecutionResult(
                 response,
                 agentExecutionBudget.getRemainingToolCall(),
@@ -238,7 +245,8 @@ public class AgentService {
                 toolCalls,
                 successful,
                 failed,
-                agentTerminationReason
+                agentTerminationReason,
+                issues
         );
     }
 

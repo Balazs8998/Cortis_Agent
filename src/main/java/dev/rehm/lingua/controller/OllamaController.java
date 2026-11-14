@@ -39,6 +39,7 @@ public class OllamaController {
                 answer.successful(),
                 answer.failed(),
                 answer.agentTerminationReason(),
+                answer.agentResponseIssues(),
                 answer.response().doneReason()
         );
 
