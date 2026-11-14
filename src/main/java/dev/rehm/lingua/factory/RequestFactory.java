@@ -19,16 +19,18 @@ public class RequestFactory {
 
     private  final MessageService messageService;
     private final ToolRegistry toolRegistry;
-    private static final String model = "qwen3:8b";
+    private static final String model = "qwen3.5:4b";
+    private final OllamaMessageDto systemMessage;
 
     public RequestFactory(MessageService messageService, ToolRegistry toolRegistry) {
         this.messageService = messageService;
         this.toolRegistry = toolRegistry;
+        this.systemMessage = messageService.firstSystemMessage();
     }
 
 
     public  @NotNull OllamaChatRequest createBaseRequest(List<OllamaMessageDto> messages) {
-        OllamaMessageDto systemMessage = messageService.firstSystemMessage();
+
         List<OllamaMessageDto> messageDtos = new ArrayList<>();
         messageDtos.add(systemMessage);
         messageDtos.addAll(messages);
@@ -36,6 +38,17 @@ public class RequestFactory {
 
         return new OllamaChatRequest(model, messageDtos, new ArrayList<>(), null, options, false, true, -1);
     }
+
+    public  @NotNull OllamaChatRequest createLastBaseRequest(List<OllamaMessageDto> messages) {
+
+        List<OllamaMessageDto> messageDtos = new ArrayList<>();
+        messageDtos.add(systemMessage);
+        messageDtos.addAll(messages);
+        RequestOption options = new RequestOption(8192, 4096, 0.2, 0.9, 0.3, 40, 1.1);
+
+        return new OllamaChatRequest(model, messageDtos, new ArrayList<>(), null, options, false, false, -1);
+    }
+
 
     public  @NotNull OllamaChatRequest createRequestWithTool(List<OllamaMessageDto> messages) {
         OllamaChatRequest request =createBaseRequest(messages);
