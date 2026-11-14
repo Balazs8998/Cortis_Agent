@@ -5,6 +5,7 @@ import dev.rehm.lingua.dto.response.ChatResponse;
 import dev.rehm.lingua.inspection.dto.AgentExecutionResult;
 import dev.rehm.lingua.service.AgentService;
 import dev.rehm.lingua.service.ConversationService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,19 +26,20 @@ public class OllamaController {
     }
 
     @PostMapping("/chat")
-    public ResponseEntity<ChatResponse> ollamaChat(@RequestBody ChatRequest request){
+    public ResponseEntity<ChatResponse> ollamaChat(@RequestBody @Valid ChatRequest request){
         AgentExecutionResult answer = this.agentService.executeAgentLoop(request.conversationId(), request.message());
 
         ChatResponse response = new ChatResponse(
                 request.conversationId(),
-                answer.message(),
+                answer.response().message().content(),
                 answer.remainingToolCalls(),
                 answer.remainingIterations(),
                 answer.toolExecutionResults(),
                 answer.toolCalls(),
                 answer.successful(),
                 answer.failed(),
-                answer.agentTerminationReason()
+                answer.agentTerminationReason(),
+                answer.response().doneReason()
         );
 
         return ResponseEntity.ok(response);

@@ -1,10 +1,12 @@
 package dev.rehm.lingua.inspection.dto;
 
+import dev.rehm.lingua.dto.response.OllamaChatResponse;
+
 import java.util.List;
 
 public record AgentExecutionResult(
 
-        String message,
+        OllamaChatResponse response,
         int remainingToolCalls,
         int remainingIterations,
         List<ToolExecutionResult> toolExecutionResults,

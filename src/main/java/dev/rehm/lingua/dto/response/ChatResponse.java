@@ -1,5 +1,6 @@
 package dev.rehm.lingua.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.rehm.lingua.inspection.dto.AgentTerminationReason;
 import dev.rehm.lingua.inspection.dto.ToolExecutionResult;
 
@@ -15,6 +16,7 @@ public record ChatResponse(
         int toolCalls,
         int successful,
         int failed,
-        AgentTerminationReason agentTerminationReason
+        AgentTerminationReason agentTerminationReason,
+        String doneReason
 ) {
 }

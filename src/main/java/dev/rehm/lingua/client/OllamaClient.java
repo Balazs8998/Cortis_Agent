@@ -3,8 +3,13 @@ package dev.rehm.lingua.client;
 
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
+import dev.rehm.lingua.exception.classes.OllamaTimeoutException;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+
+import java.net.SocketTimeoutException;
+import java.time.Instant;
 
 @Component
 public class OllamaClient {
@@ -18,7 +23,25 @@ public class OllamaClient {
 
     public OllamaChatResponse sendMessage(OllamaChatRequest request){
 
-       return client.post().uri("/api/chat").body(request).retrieve().body(OllamaChatResponse.class);
+        try {
+            return client.post()
+                    .uri("/api/chat")
+                    .body(request)
+                    .retrieve()
+                    .body(OllamaChatResponse.class);
+
+        } catch (ResourceAccessException e) {
+
+            if (e.getMostSpecificCause() instanceof SocketTimeoutException) {
+                throw new OllamaTimeoutException(
+                        "sendChatRequest",
+                        "ollamaUrl",
+                        "ollama-api/chat"
+                );
+            }
+
+            throw e;
+        }
     }
 
 

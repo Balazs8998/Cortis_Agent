@@ -97,9 +97,6 @@ public class AgentService {
 
             agentExecutionBudget.loopStep();
 
-
-
-
             response = agentMessage(ollamaChatRequestWithTool);
 
             if (!hasToolCalling(response)
@@ -121,9 +118,6 @@ public class AgentService {
                     );
                 }
             }
-
-
-
 
             messageService.saveMessages(uuid, response.message());
             hasToolCalling = hasToolCalling(response);
@@ -237,7 +231,7 @@ public class AgentService {
         }
 
         return new AgentExecutionResult(
-                response.message().content(),
+                response,
                 agentExecutionBudget.getRemainingToolCall(),
                 agentExecutionBudget.getRemainingIterations(),
                 toolExecutionResults,

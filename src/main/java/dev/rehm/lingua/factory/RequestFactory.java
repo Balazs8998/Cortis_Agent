@@ -44,7 +44,7 @@ public class RequestFactory {
         List<OllamaMessageDto> messageDtos = new ArrayList<>();
         messageDtos.add(systemMessage);
         messageDtos.addAll(messages);
-        RequestOption options = new RequestOption(8192, 4096, 0.2, 0.9, 0.3, 40, 1.1);
+        RequestOption options = new RequestOption(8192, 512, 0.2, 0.9, 0.3, 40, 1.1);
 
         return new OllamaChatRequest(model, messageDtos, new ArrayList<>(), null, options, false, false, -1);
     }
