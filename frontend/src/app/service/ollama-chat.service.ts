@@ -2,12 +2,19 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
-interface ChatRequest {
+export type LlmModel = 'qwen3.5:4b' | 'qwen3:8b' | 'gpt-oss:20b';
+
+export interface ChatRequest {
   conversationId: string;
   message: string;
+  model: LlmModel;
+  think: boolean;
 }
 
 export interface ChatResponse {
+  conversationId?: string;
+  agentResponseIssues?: string[] | null;
+  doneReason?: string | null;
   message: string;
   remainingToolCalls: number;
   remainingIterations: number;
@@ -18,22 +25,10 @@ export interface ChatResponse {
   agentTerminationReason: AgentTerminationReason;
 }
 
-interface CreateConversationResponse {
-  id: string;
-}
-
-export type AgentTerminationReason =
-  | 'COMPLETED'
-  | 'ITERATION_LIMIT_REACHED'
-  | 'TOOL_LIMIT_REACHED';
+export type AgentTerminationReason = 'COMPLETED' | 'ITERATION_LIMIT_REACHED' | 'TOOL_LIMIT_REACHED';
 
 export type ToolExecutionStatus =
-  | 'SUCCESS'
-  | 'SUCCES'
-  | 'FAILED'
-  | 'SKIPPED'
-  | 'REJECTED'
-  | 'TIMEOUT';
+  'SUCCESS' | 'SUCCES' | 'FAILED' | 'SKIPPED' | 'REJECTED' | 'TIMEOUT';
 
 export interface ToolExecutionResult {
   toolName: string;
@@ -47,32 +42,25 @@ export interface ToolExecutionResult {
   toolCallIndex: number | null;
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isConversationId(value: string): boolean {
   return UUID_PATTERN.test(value);
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class OllamaChatService {
-
   private readonly http = inject(HttpClient);
 
   private readonly chatUrl = '/api/ollama/chat';
 
-  private readonly conversationUrl =
-    '/api/ollama/conversations';
+  private readonly conversationUrl = '/api/ollama/conversations';
 
   createConversation(): Observable<string> {
-    return this.http.post(
-      this.conversationUrl,
-      {},
-      { responseType: 'text' }
-    ).pipe(
-      map(response => {
+    return this.http.post(this.conversationUrl, {}, { responseType: 'text' }).pipe(
+      map((response) => {
         const conversationId = response.trim();
 
         if (!isConversationId(conversationId)) {
@@ -80,22 +68,23 @@ export class OllamaChatService {
         }
 
         return conversationId;
-      })
+      }),
     );
   }
 
   sendMessage(
     conversationId: string,
-    message: string
+    message: string,
+    model: LlmModel = 'qwen3.5:4b',
+    think: boolean = true,
   ): Observable<ChatResponse> {
     const request: ChatRequest = {
       conversationId,
-      message
+      message,
+      model,
+      think,
     };
 
-    return this.http.post<ChatResponse>(
-      this.chatUrl,
-      request
-    );
+    return this.http.post<ChatResponse>(this.chatUrl, request);
   }
 }
