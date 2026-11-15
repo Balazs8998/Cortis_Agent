@@ -17,7 +17,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   OllamaChatService,
   isConversationId,
-  ChatResponse
+  ChatResponse,
+  ChatRequest,
+  LlmModel,
 } from '../service/ollama-chat.service';
 import { Panel } from '../workspace/panel';
 
@@ -27,13 +29,14 @@ interface Message {
   content: string;
   time: number;
   failed?: boolean;
+  issues?: string[];
 }
 interface Run {
   id: number;
   time: number;
-  status: 'Running' | 'Completed' | 'Failed';
+  status: 'Running' | 'Completed' | 'Warning' | 'Failed';
   duration: number | null;
-  request: unknown;
+  request: ChatRequest;
   response?: ChatResponse;
   remainingToolCalls?: number;
   remainingIterations?: number;
@@ -43,7 +46,7 @@ interface Run {
   selector: 'app-chat',
   imports: [FormsModule, DatePipe, JsonPipe, Panel],
   templateUrl: './chat.html',
-  styleUrls: ['./chat.css', './inspector.css'],
+  styleUrls: ['./chat.css', './inspector.css', './profiles.css'],
 })
 export class Chat implements AfterViewInit {
   private service = inject(OllamaChatService);
@@ -56,14 +59,21 @@ export class Chat implements AfterViewInit {
   @ViewChild('messageList') messageList?: ElementRef<HTMLElement>;
   readonly conversationId = signal('');
   readonly draft = signal('');
+  readonly models: LlmModel[] = ['qwen3.5:4b', 'qwen3:8b', 'gpt-oss:20b'];
+  readonly model = signal<LlmModel>('qwen3.5:4b');
+  readonly think = signal(true);
+  readonly selectedIssues = computed(() => this.responseIssues(this.selected()?.response));
   readonly isLoading = signal(false);
   readonly errorMessage = signal('');
   readonly messages = signal<Message[]>([]);
   readonly runs = signal<Run[]>([]);
   readonly selectedId = signal<number | null>(null);
   readonly selected = computed(
-    () => this.runs().find((r) => r.id === this.selectedId()) ?? this.runs().at(-1),);
-  readonly selectedToolExecutions = computed(() => this.selected()?.response?.toolExecutionResults ?? [],);
+    () => this.runs().find((r) => r.id === this.selectedId()) ?? this.runs().at(-1),
+  );
+  readonly selectedToolExecutions = computed(
+    () => this.selected()?.response?.toolExecutionResults ?? [],
+  );
   readonly tab = signal('Overview');
   readonly tabs = ['Overview', 'Messages', 'Timeline', 'Tools', 'Raw'];
   readonly role = signal('all');
@@ -93,10 +103,18 @@ export class Chat implements AfterViewInit {
     const id = this.nextId++,
       start = performance.now(),
       time = Date.now();
+    const model = this.model(),
+      think = this.think();
     this.messages.update((m) => [...m, { id, role: 'user', content: message, time }]);
     this.runs.update((r) => [
       ...r,
-      { id, time, status: 'Running', duration: null, request: { conversationId, message } },
+      {
+        id,
+        time,
+        status: 'Running',
+        duration: null,
+        request: { conversationId, message, model, think },
+      },
     ]);
     this.selectedId.set(id);
     this.draft.set('');
@@ -104,7 +122,7 @@ export class Chat implements AfterViewInit {
     this.isLoading.set(true);
     this.scroll();
     this.service
-      .sendMessage(conversationId, message)
+      .sendMessage(conversationId, message, model, think)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => {
@@ -116,14 +134,24 @@ export class Chat implements AfterViewInit {
         next: (response) => {
           this.messages.update((m) => [
             ...m,
-            { id: this.nextId++, role: 'assistant', content: response.message, time: Date.now() },
+            {
+              id: this.nextId++,
+              role: 'assistant',
+              content: response.message,
+              time: Date.now(),
+              issues: this.responseIssues(response),
+            },
           ]);
           this.updateRun(id, {
-            status: 'Completed',
+            status:
+              this.responseIssues(response).length ||
+              (response.agentTerminationReason && response.agentTerminationReason !== 'COMPLETED')
+                ? 'Warning'
+                : 'Completed',
             response,
             duration: Math.round(performance.now() - start),
             remainingToolCalls: response.remainingToolCalls,
-            remainingIterations: response.remainingIterations
+            remainingIterations: response.remainingIterations,
           });
         },
         error: (error) => {
@@ -143,6 +171,27 @@ export class Chat implements AfterViewInit {
           });
         },
       });
+  }
+  profileLabel(model: LlmModel, think: boolean): string {
+    if (model === 'gpt-oss:20b') return think ? 'Erős gondolkodás · high' : 'Normál · low';
+    return think ? 'Erős gondolkodás · bekapcsolva' : 'Normál · kikapcsolva';
+  }
+  responseIssues(response?: ChatResponse): string[] {
+    if (!response) return [];
+    const issues = new Set(response.agentResponseIssues ?? []);
+    if (response.doneReason === 'length') issues.add('MODEL_OUTPUT_TRUNCATED');
+    if (!response.message?.trim()) issues.add('MODEL_RESPONSE_EMPTY');
+    return [...issues];
+  }
+  issueLabel(issue: string): string {
+    switch (issue) {
+      case 'MODEL_OUTPUT_TRUNCATED':
+        return 'Csonkolt válasz: a modell elérte a generálási korlátot.';
+      case 'MODEL_RESPONSE_EMPTY':
+        return 'Üres válasz: nem érkezett megjeleníthető szöveg.';
+      default:
+        return 'Modelljelzés: ' + issue;
+    }
   }
   private updateRun(id: number, changes: Partial<Run>) {
     this.runs.update((r) => r.map((v) => (v.id === id ? { ...v, ...changes } : v)));

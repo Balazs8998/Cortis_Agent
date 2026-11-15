@@ -1,6 +1,6 @@
 package dev.rehm.lingua.tool;
 
-import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
+import dev.rehm.lingua.tool.schema.ToolRequestFunction;
 
 import java.util.Map;
 

@@ -1,9 +1,9 @@
 package dev.rehm.lingua.tool.calculator;
 
-import dev.rehm.lingua.argument.ArgumentHandler;
-import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
-import dev.rehm.lingua.dto.request.tool.ToolRequestParameters;
-import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
+import dev.rehm.lingua.tool.ArgumentHandler;
+import dev.rehm.lingua.tool.schema.ToolRequestFunction;
+import dev.rehm.lingua.tool.schema.ToolRequestParameters;
+import dev.rehm.lingua.tool.schema.ToolRequestProperties;
 import dev.rehm.lingua.tool.AgentTool;
 import org.springframework.stereotype.Component;
 
@@ -57,35 +57,6 @@ public class AddTool implements AgentTool {
                 Thread.currentThread().threadId(),
                 Thread.currentThread().isVirtual()
         );
-
-    try {
-    Number a = (Number) arguments.get("a");
-
-    Thread.sleep(a.intValue() == 5 ? 8000L : 2000L);
-
-} catch (InterruptedException e) {
-    Thread.currentThread().interrupt();
-    throw new IllegalStateException("Tool interrupted", e);
-}
-
-//        if (arguments.get("a").equals(5)){
-//        try {
-//            System.out.println("ADD TOOL: Starting 7s delay...");
-//
-//            Thread.sleep(7000);
-//
-//            System.out.println("ADD TOOL: Delay completed");
-//
-//        } catch (InterruptedException e) {
-//            Thread.currentThread().interrupt();
-//
-//            System.out.println("ADD TOOL: INTERRUPTED!");
-//
-//            throw new IllegalStateException(
-//                    "Tool execution was interrupted", e
-//            );
-//        }
-//        }
 
         double b = argumentHandler.getArgument(definition(),"add","b", arguments.get("b"),Double.class);
         double a = argumentHandler.getArgument(definition(),"add","a",arguments.get("a"),Double.class);

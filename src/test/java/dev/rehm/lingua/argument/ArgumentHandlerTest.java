@@ -1,9 +1,10 @@
 package dev.rehm.lingua.argument;
 
-import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
-import dev.rehm.lingua.dto.request.tool.ToolRequestParameters;
-import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
-import dev.rehm.lingua.registry.ToolRegistry;
+import dev.rehm.lingua.tool.ArgumentHandler;
+import dev.rehm.lingua.tool.schema.ToolRequestFunction;
+import dev.rehm.lingua.tool.schema.ToolRequestParameters;
+import dev.rehm.lingua.tool.schema.ToolRequestProperties;
+import dev.rehm.lingua.tool.ToolRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;

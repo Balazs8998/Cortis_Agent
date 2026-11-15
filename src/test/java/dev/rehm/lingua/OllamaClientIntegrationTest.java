@@ -1,20 +1,8 @@
 package dev.rehm.lingua;
 
-import dev.rehm.lingua.client.OllamaClient;
-import dev.rehm.lingua.dto.OllamaMessageDto;
-import dev.rehm.lingua.dto.request.OllamaChatRequest;
-import dev.rehm.lingua.dto.request.RequestOption;
-import dev.rehm.lingua.dto.response.OllamaChatResponse;
-import dev.rehm.lingua.service.OllamaService;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
+import dev.rehm.lingua.llm.ollama.OllamaClient;
+import dev.rehm.lingua.llm.ollama.OllamaService;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 public class OllamaClientIntegrationTest {

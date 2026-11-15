@@ -1,9 +1,9 @@
 <main class="console">
   <header class="topbar">
     <a class="brand" href="/" (click)="$event.preventDefault(); backToHome()"
-    ><span class="logo">C</span>CORTIS<span class="edition">/ AGENT WORKSPACE</span></a
+      ><span class="logo">C</span>CORTIS<span class="edition">/ AGENT WORKSPACE</span></a
     ><span class="session">SESSION {{ conversationId().slice(0, 8) }}</span
-  ><span class="badge">{{ isLoading() ? '◌ REQUEST RUNNING' : '◇ STANDBY' }}</span>
+    ><span class="badge">{{ isLoading() ? '◌ REQUEST RUNNING' : '◇ STANDBY' }}</span>
   </header>
   <div class="workspace-heading">
     <div>
@@ -19,6 +19,38 @@
         <div><strong>CORTIS Agent</strong><small>Saját agent. Közvetlen kapcsolat.</small></div>
         <span class="pill">HTTP</span>
       </div>
+      <fieldset class="profile-settings" [disabled]="isLoading()">
+        <legend>Modell és profil</legend>
+        <div class="profile-fields">
+          <label
+            >Modell
+            <select aria-label="Modell" [ngModel]="model()" (ngModelChange)="model.set($event)">
+              @for (name of models; track name) {
+                <option [ngValue]="name">{{ name }}</option>
+              }
+            </select>
+          </label>
+          <label
+            >Működési profil
+            <select
+              aria-label="Működési profil"
+              [ngModel]="think()"
+              (ngModelChange)="think.set($event)"
+            >
+              <option [ngValue]="true">Erős gondolkodás</option>
+              <option [ngValue]="false">Normál</option>
+            </select>
+          </label>
+        </div>
+        <p class="profile-hint">
+          @if (model() === 'gpt-oss:20b') {
+            GPT-OSS: {{ think() ? 'high' : 'low' }} gondolkodási szint. Teljesen nem kapcsolható ki.
+          } @else {
+            Gondolkodás {{ think() ? 'bekapcsolva' : 'kikapcsolva' }}.
+          }
+          A kiválasztás a következő üzenetre érvényes.
+        </p>
+      </fieldset>
       <div class="messages" #messageList aria-live="polite" [attr.aria-busy]="isLoading()">
         @if (!messages().length) {
           <div class="welcome">
@@ -37,7 +69,10 @@
               <b>{{ m.role === 'user' ? 'TE' : 'CORTIS' }}</b
               ><time>{{ m.time | date: 'HH:mm:ss' }}</time>
             </div>
-            <p>{{ m.content }}</p>
+            <p>{{ m.content || 'Nem érkezett szöveges válasz.' }}</p>
+            @for (issue of m.issues ?? []; track issue) {
+              <p class="response-warning" role="status">⚠ {{ issueLabel(issue) }}</p>
+            }
             @if (m.failed) {
               <small class="error">⚠ Nem érkezett válasz</small>
             }
@@ -61,13 +96,13 @@
             rows="2"
           ></textarea
           ><button
-          class="send"
-          (click)="sendMessage()"
-          [disabled]="isLoading() || !draft().trim()"
-          aria-label="Üzenet küldése"
-        >
-          ↑
-        </button>
+            class="send"
+            (click)="sendMessage()"
+            [disabled]="isLoading() || !draft().trim()"
+            aria-label="Üzenet küldése"
+          >
+            ↑
+          </button>
         </div>
         <div class="composer-hint">
           <span>ENTER küldés · SHIFT + ENTER új sor</span><span>LOCAL AGENT ↗</span>
@@ -96,17 +131,17 @@
       <div class="inspector-content">
         @if (runs().length) {
           <label class="run-picker"
-          >REQUEST<select
-            aria-label="Vizsgált kérés"
-            [ngModel]="selectedId()"
-            (ngModelChange)="selectedId.set($event)"
-          >
-            @for (r of runs(); track r.id) {
-              <option [ngValue]="r.id">
-                #{{ r.id }} · {{ r.time | date: 'HH:mm:ss' }} · {{ r.status }}
-              </option>
-            }
-          </select></label
+            >REQUEST<select
+              aria-label="Vizsgált kérés"
+              [ngModel]="selectedId()"
+              (ngModelChange)="selectedId.set($event)"
+            >
+              @for (r of runs(); track r.id) {
+                <option [ngValue]="r.id">
+                  #{{ r.id }} · {{ r.time | date: 'HH:mm:ss' }} · {{ r.status }}
+                </option>
+              }
+            </select></label
           >
         }
         @switch (tab()) {
@@ -118,29 +153,63 @@
                 ><strong [class.error]="selected()?.status === 'Failed'">{{
                   selected()?.status ?? 'Ready'
                 }}</strong
-              ><span>{{
+                ><span>{{
                   selected() ? 'Böngészőben megfigyelt állapot' : 'Várakozás az első kérésre'
                 }}</span>
               </div>
               <div>
                 <small>ROUND TRIP</small
                 ><strong>{{ selected()?.duration ?? '—' }}<em>ms</em></strong
-              ><span>Teljes HTTP-válaszidő</span>
+                ><span>Teljes HTTP-válaszidő</span>
               </div>
               <div>
-                <small>REMAINING ITERATIONS</small><strong>{{selected()?.remainingIterations}}</strong>
+                <small>REMAINING ITERATIONS</small
+                ><strong>{{ selected()?.remainingIterations ?? '—' }}</strong>
               </div>
               <div>
-                <small>REMAINING TOOLS</small><strong>{{selected()?.remainingToolCalls}}</strong>
+                <small>REMAINING TOOLS</small
+                ><strong>{{ selected()?.remainingToolCalls ?? '—' }}</strong>
               </div>
               <div class="termination-reason">
                 <small>AGENT TERMINATION REASON</small>
-                <strong [class.error]="selected()?.response?.agentTerminationReason === 'ITERATION_LIMIT_REACHED' || selected()?.response?.agentTerminationReason === 'TOOL_LIMIT_REACHED'">
+                <strong
+                  [class.error]="
+                    selected()?.response?.agentTerminationReason === 'ITERATION_LIMIT_REACHED' ||
+                    selected()?.response?.agentTerminationReason === 'TOOL_LIMIT_REACHED'
+                  "
+                >
                   {{ selected()?.response?.agentTerminationReason ?? '-' }}
                 </strong>
                 <span>Agent végrehajtásának lezárási oka</span>
               </div>
             </div>
+            @if (selected(); as run) {
+              <div class="section-label spaced">
+                REQUEST PROFILE <span>ELKÜLDÖTT BEÁLLÍTÁSOK</span>
+              </div>
+              <dl class="profile-summary">
+                <div>
+                  <dt>Modell</dt>
+                  <dd>{{ run.request.model }}</dd>
+                </div>
+                <div>
+                  <dt>Agent profil</dt>
+                  <dd>{{ profileLabel(run.request.model, run.request.think) }}</dd>
+                </div>
+                <div>
+                  <dt>Modell lezárási oka</dt>
+                  <dd>{{ run.response?.doneReason ?? '—' }}</dd>
+                </div>
+                <div>
+                  <dt>Beszélgetés</dt>
+                  <dd>{{ run.response?.conversationId ?? run.request.conversationId }}</dd>
+                </div>
+              </dl>
+              <p class="muted">
+                A lezáró profilt a backend választja szükség esetén. A válasz nem tartalmazza a
+                ténylegesen használt profil paramétereit.
+              </p>
+            }
             <div class="section-label spaced">CONNECTION MAP</div>
             <div class="connection">
               <span>Browser</span><i>→</i><span>Spring agent</span><i>→</i><span>Ollama</span>
@@ -148,22 +217,39 @@
             <div class="notice">
               <b>◈ Agent execution telemetry</b>
               <p>
-                A futás végén rendelkezésre állnak a
-                toolhívások, az eredmények és a budgetértékek.
-                A részleteket a Tools fülön vizsgálhatod.
-                A valós idejű eseménykövetés még nem aktív.
+                A futás végén rendelkezésre állnak a toolhívások, az eredmények és a budgetértékek.
+                A részleteket a Tools fülön vizsgálhatod. A valós idejű eseménykövetés még nem
+                aktív.
               </p>
             </div>
             <details open>
               <summary>
-                Diagnostics <span>{{ errorMessage() ? '1 issue' : 'HTTP only' }}</span>
+                Diagnostics <span>{{ selectedIssues().length }} modelljelzés</span>
               </summary>
-              <p class="diagnostic">
-                {{
-                  errorMessage() ||
-                  'A HTTP-adatok és a futás végén visszaküldött tooladatok megtekinthetők.'
-                }}
-              </p>
+              @if (selected()?.error; as error) {
+                <p class="diagnostic error">A kiválasztott kérés sikertelen.</p>
+                <pre>{{ error | json }}</pre>
+              } @else if (selected()?.status === 'Running') {
+                <p class="diagnostic">
+                  A kérés folyamatban van; diagnosztika a válasz után érkezik.
+                </p>
+              } @else if (selected()?.response; as response) {
+                @if (response.agentTerminationReason !== 'COMPLETED') {
+                  <p class="diagnostic response-warning">
+                    ⚠ Az agent limit miatt állt le: {{ response.agentTerminationReason }}. A feladat
+                    részben maradhatott kész.
+                  </p>
+                }
+                @for (issue of selectedIssues(); track issue) {
+                  <p class="diagnostic response-warning">
+                    ⚠ {{ issueLabel(issue) }} <code>{{ issue }}</code>
+                  </p>
+                } @empty {
+                  <p class="diagnostic">Nincs jelzett modellválasz-probléma.</p>
+                }
+              } @else {
+                <p class="diagnostic">Várakozás az első kérésre.</p>
+              }
             </details>
           }
           @case ('Messages') {
@@ -198,8 +284,8 @@
               <div class="timeline-item">
                 <small>{{ r.time | date: 'HH:mm:ss' }}</small
                 ><b>#{{ r.id }} · POST /api/ollama/chat</b
-              ><span>{{ r.status }} · {{ r.duration ?? '…' }} ms</span
-              ><button (click)="selectedId.set(r.id); tab.set('Raw')">Kérés részletei ↗</button>
+                ><span>{{ r.status }} · {{ r.duration ?? '…' }} ms</span
+                ><button (click)="selectedId.set(r.id); tab.set('Raw')">Kérés részletei ↗</button>
               </div>
             } @empty {
               <div class="empty">
@@ -214,7 +300,6 @@
             </div>
 
             @if (selected(); as run) {
-
               <div class="metrics">
                 <div>
                   <small>TOOL CALLS</small>
@@ -245,37 +330,34 @@
 
               <div class="section-label spaced">
                 EXECUTION HISTORY
-                <span>
-        {{ selectedToolExecutions().length }} ENTRIES
-      </span>
+                <span> {{ selectedToolExecutions().length }} ENTRIES </span>
               </div>
 
               @for (tool of selectedToolExecutions(); track $index) {
-
                 <details class="tool-execution">
-
                   <summary>
-          <span class="role">
-            #{{ $index + 1 }}
-          </span>
+                    <span class="role"> #{{ $index + 1 }} </span>
 
                     <strong>{{ tool.toolName }}</strong>
 
                     <span
                       class="tool-status"
-                      [class.error]="tool.status === 'FAILED'"
+                      [class.error]="
+                        tool.status === 'FAILED' ||
+                        tool.status === 'TIMEOUT' ||
+                        tool.status === 'REJECTED'
+                      "
                     >
-            {{ tool.status }}
-          </span>
+                      {{ tool.status }}
+                    </span>
                   </summary>
 
                   <div class="tool-details">
-
                     <div class="tool-metadata">
                       <div>
                         <small>EXECUTED AT</small>
                         <strong>
-                          {{ tool.executedAt | date:'HH:mm:ss.SSS' }}
+                          {{ tool.executedAt | date: 'HH:mm:ss.SSS' }}
                         </strong>
                       </div>
 
@@ -287,7 +369,11 @@
                       <div>
                         <small>STATUS</small>
                         <strong
-                          [class.error]="tool.status === 'FAILED'"
+                          [class.error]="
+                            tool.status === 'FAILED' ||
+                            tool.status === 'TIMEOUT' ||
+                            tool.status === 'REJECTED'
+                          "
                         >
                           {{ tool.status }}
                         </strong>
@@ -305,59 +391,39 @@
 
                       <div>
                         <small>VIRTUAL THREAD</small>
-                        <strong>{{ tool.startThreadId == null ? '—' : (tool.startIsVirtual ? 'Yes' : 'No') }}</strong>
+                        <strong>{{
+                          tool.startThreadId == null ? '—' : tool.startIsVirtual ? 'Yes' : 'No'
+                        }}</strong>
                       </div>
                     </div>
 
-                    <div class="section-label spaced">
-                      ARGUMENTS
-                    </div>
+                    <div class="section-label spaced">ARGUMENTS</div>
 
                     <pre>{{ tool.arguments | json }}</pre>
 
-                    <div class="section-label spaced">
-                      EXECUTION RESULT
-                    </div>
+                    <div class="section-label spaced">EXECUTION RESULT</div>
 
                     <pre>{{ tool.result | json }}</pre>
-
                   </div>
-
                 </details>
-
               } @empty {
-
                 <div class="empty">
                   <div class="orbit">⌘</div>
                   <h2>No tool executions</h2>
 
                   @if (run.status === 'Running') {
-                    <p>
-                      Az agent még dolgozik.
-                      A toolhívások a válasz beérkezésekor
-                      jelennek meg.
-                    </p>
+                    <p>Az agent még dolgozik. A toolhívások a válasz beérkezésekor jelennek meg.</p>
                   } @else {
-                    <p>
-                      Ehhez a futáshoz nem érkezett
-                      toolvégrehajtási adat.
-                    </p>
+                    <p>Ehhez a futáshoz nem érkezett toolvégrehajtási adat.</p>
                   }
                 </div>
-
               }
-
             } @else {
-
               <div class="empty">
                 <div class="orbit">⌘</div>
                 <h2>Tool inspector</h2>
-                <p>
-                  Küldj egy üzenetet az agentnek
-                  a végrehajtási adatok megtekintéséhez.
-                </p>
+                <p>Küldj egy üzenetet az agentnek a végrehajtási adatok megtekintéséhez.</p>
               </div>
-
             }
           }
 
@@ -388,8 +454,8 @@
       <button (click)="chatPanel.restore()" [class.minimized]="chatPanel.minimized()">
         ▣ Chat {{ chatPanel.minimized() ? '↥' : '' }}</button
       ><button (click)="inspectorPanel.restore()" [class.minimized]="inspectorPanel.minimized()">
-      ⌘ Inspector {{ inspectorPanel.minimized() ? '↥' : '' }}
-    </button>
+        ⌘ Inspector {{ inspectorPanel.minimized() ? '↥' : '' }}
+      </button>
     </div>
     <span>Húzd a fejlécet · Méretezz a jobb alsó saroknál</span
     ><span class="edition">CORTIS / WORKSPACE 01</span>

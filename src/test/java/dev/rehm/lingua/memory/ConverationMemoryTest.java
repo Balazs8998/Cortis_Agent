@@ -1,15 +1,5 @@
 package dev.rehm.lingua.memory;
 
-import dev.rehm.lingua.dto.OllamaMessageDto;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 //class ConverationMemoryTest {
 
 //    private ConversationMemory conversationMemory;
