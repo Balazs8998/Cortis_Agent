@@ -1,5 +1,6 @@
 package dev.rehm.lingua.conversation;
 
+import dev.rehm.lingua.common.exception.classes.ConversationNotFoundException;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import org.springframework.stereotype.Component;
 
@@ -17,15 +18,15 @@ public class ConversationMemory {
     }
 
     public ConversationMessage getConversation(UUID uuid) {
-
         ConversationMessage conversation = messageMap.get(uuid);
 
         if (conversation == null) {
-            throw new NoSuchElementException(
-                    "Conversation not found: " + uuid
+            throw new ConversationNotFoundException(
+                    "getConversation",
+                    "conversationId",
+                    uuid
             );
         }
-
         return conversation;
     }
 
@@ -41,7 +42,8 @@ public class ConversationMemory {
         return getConversation(uuid).getMessages();
     }
 
-    public Map<UUID, ConversationMessage> getMessageMap() {
-        return Map.copyOf(messageMap);
+    public int getMapSize(){
+       return this.messageMap.size();
     }
+
 }

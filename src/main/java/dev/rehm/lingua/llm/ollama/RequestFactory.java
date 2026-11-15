@@ -45,23 +45,6 @@ public class RequestFactory {
         return new OllamaChatRequest(llmProfile.getModel(), messageDtos, new ArrayList<>(), null, options, false, llmProfile.isThink(), -1);
     }
 
-    public  @NotNull OllamaChatRequest createLastBaseRequest(List<OllamaMessageDto> messages,LlmProfile llmProfile) {
-
-        List<OllamaMessageDto> messageDtos = new ArrayList<>();
-        messageDtos.add(systemMessage);
-        messageDtos.addAll(messages);
-        RequestOption options =
-                new RequestOption(llmProfile.getNumCtx(),
-                        llmProfile.getNumPredict(),
-                        llmProfile.getTemperature(),
-                        llmProfile.getTopP(),
-                        llmProfile.getMinP(),
-                        llmProfile.getTopK(),
-                        llmProfile.getRepeatPenalty());
-
-        return new OllamaChatRequest(llmProfile.getModel(), messageDtos, new ArrayList<>(), null, options, false,llmProfile.isThink(), -1);
-    }
-
 
     public  @NotNull OllamaChatRequest createRequestWithTool(List<OllamaMessageDto> messages, LlmProfile llmProfile) {
         OllamaChatRequest request =createBaseRequest(messages, llmProfile);

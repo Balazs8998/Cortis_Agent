@@ -215,17 +215,6 @@ public class MessageService {
         saveMessages(uuid, message);
     }
 
-    public void saveToolCallLimitExceededMessage(UUID uuid, String toolName) {
-        OllamaMessageDto message = new OllamaMessageDto(
-                "tool",
-                toolName,
-                "Tool execution denied: The tool call limit has been reached. No further tool calls are allowed." +
-                        " The task was interrupted. Inform the user that the task could not be completed. Do not fabricate missing results.",
-                null
-        );
-        saveMessages(uuid, message);
-    }
-
     public OllamaMessageDto firstSystemMessage() {
         return new OllamaMessageDto("system", null, SYSTEM_PROMPT, null);
 
