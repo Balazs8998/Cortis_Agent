@@ -132,7 +132,7 @@ public class AgentService {
                 System.out.println("Empty final response. Retrying without tools.");
 
                 response = agentMessage(
-                        requestFactory.createLastBaseRequest(messages, llmProfiles.finalProfile())
+                        requestFactory.createBaseRequest(messages, llmProfiles.finalProfile())
                 );
 
                 if (hasToolCalling(response)
@@ -222,7 +222,7 @@ public class AgentService {
 
         messages.add(iterationMessage);
 
-        OllamaChatRequest ollamaChatRequest = requestFactory.createLastBaseRequest(messages,llmProfile);
+        OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(messages,llmProfile);
 
         OllamaChatResponse response = agentMessage(ollamaChatRequest);
         messageService.saveMessages(uuid, response.message());

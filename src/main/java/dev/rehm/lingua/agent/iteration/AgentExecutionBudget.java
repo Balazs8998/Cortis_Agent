@@ -1,5 +1,8 @@
 package dev.rehm.lingua.agent.iteration;
 
+import dev.rehm.lingua.common.exception.classes.IterationValueException;
+import dev.rehm.lingua.common.exception.classes.ToolBudgetException;
+
 public class AgentExecutionBudget {
 
     int remainingToolCall;
@@ -7,29 +10,39 @@ public class AgentExecutionBudget {
     int iterations;
 
     public AgentExecutionBudget(int remainingToolCall, int remainingIterations) {
-        this.remainingToolCall = remainingToolCall;
-        this.remainingIterations = remainingIterations;
+        this.remainingToolCall = remainingToolCall< 0 ? 4 : remainingToolCall;
+        this.remainingIterations = remainingIterations<= 0 ? 6 : remainingIterations;
         this.iterations = 0;
     }
 
     public AgentExecutionBudget(int remainingToolCall) {
-        this.remainingToolCall = remainingToolCall;
-        this.remainingIterations = remainingToolCall + 2;
+        this.remainingToolCall = remainingToolCall< 0 ? 4 : remainingToolCall;
+        this.remainingIterations = remainingToolCall<= 0 ? 6 : remainingToolCall + 2;
         this.iterations = 0;
     }
 
-    public AgentExecutionBudget() {
-    }
 
-    public void loopStep(){
-        decrementRemainingIterations();
-        incrementIterations();
+    public void loopStep() {
+
+        if (remainingIterations <= 0) {
+            throw new IterationValueException(
+                    "loopStep",
+                    "remainingIterations",
+                    remainingIterations
+            );
+        }
+
+        this.remainingIterations--;
+        this.iterations++;
     }
 
     public int reserveBudget(int requestedToolCalls) {
+
         if (requestedToolCalls < 0) {
-            throw new IllegalArgumentException(
-                    "Requested tool calls cannot be negative"
+            throw new ToolBudgetException(
+                    "reserveBudget",
+                    "requestedToolCalls",
+                    requestedToolCalls
             );
         }
 
@@ -42,21 +55,6 @@ public class AgentExecutionBudget {
 
         return approved;
     }
-
-    public void decrementRemainingTools(){
-        if (remainingToolCall> 0)
-        this.remainingToolCall--;
-    }
-
-    public void decrementRemainingIterations(){
-        if (remainingIterations > 0)
-            this.remainingIterations--;
-    }
-
-    public void incrementIterations(){
-        this.iterations++;
-    }
-
 
     public int getRemainingToolCall() {
         return remainingToolCall;
@@ -75,4 +73,6 @@ public class AgentExecutionBudget {
         System.out.println("Remaining loop iterations: " + this.remainingIterations);
         System.out.println("Remaining tool calls: " + this.remainingToolCall);
     }
+
+
 }

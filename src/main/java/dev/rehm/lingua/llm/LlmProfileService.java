@@ -1,8 +1,7 @@
 package dev.rehm.lingua.llm;
 
+import dev.rehm.lingua.common.exception.classes.UnsupportedLlmModelException;
 import org.springframework.stereotype.Service;
-
-
 
 
 @Service
@@ -31,8 +30,10 @@ public class LlmProfileService {
                     LlmProfileFactory.gptOssFinal()
             );
 
-            default -> throw new IllegalArgumentException(
-                    "Unsupported model: " + model
+            default -> throw new UnsupportedLlmModelException(
+                    "createLlmProfiles",
+                    "model",
+                    model
             );
         };
     }
