@@ -27,7 +27,7 @@ public class OllamaController {
 
     @PostMapping("/chat")
     public ResponseEntity<ChatResponse> ollamaChat(@RequestBody @Valid ChatRequest request){
-        AgentExecutionResult answer = this.agentService.executeAgentLoop(request.conversationId(), request.message());
+        AgentExecutionResult answer = this.agentService.executeAgentLoop(request);
 
         ChatResponse response = new ChatResponse(
                 request.conversationId(),

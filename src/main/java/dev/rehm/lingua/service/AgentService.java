@@ -8,7 +8,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 
+import dev.rehm.lingua.domain.LlmProfile;
 import dev.rehm.lingua.dto.OllamaMessageDto;
+import dev.rehm.lingua.dto.llm.LlmProfiles;
+import dev.rehm.lingua.dto.request.ChatRequest;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.response.OllamaChatResponse;
 import dev.rehm.lingua.dto.response.tool.ToolCallResponse;
@@ -32,9 +35,10 @@ public class AgentService {
     private final MessageService messageService;
     private final RequestFactory requestFactory;
     private final ConversationService conversationService;
+    private final LlmProfileService llmProfileService;
 
 
-    public AgentService(MessageService messageService, ToolExecutorService executorService, OllamaService ollamaService, RequestFactory requestFactory, ConversationService conversationService) {
+    public AgentService(MessageService messageService, ToolExecutorService executorService, OllamaService ollamaService, RequestFactory requestFactory, ConversationService conversationService, LlmProfileService llmProfileService) {
 
         this.messageService = messageService;
         this.executorService = executorService;
@@ -42,34 +46,49 @@ public class AgentService {
         this.requestFactory = requestFactory;
 
         this.conversationService = conversationService;
+        this.llmProfileService = llmProfileService;
     }
 
     public AgentExecutionResult executeAgentLoop(
-            UUID uuid,
-            String userMessage
+            ChatRequest request
     ) {
 
-        logLock("WAITING",uuid);
+        logLock("WAITING",request.conversationId());
 
         return conversationService.executeSerialized(
-                uuid,
+                request.conversationId(),
                 () -> {
-                    logLock("ACQUIRED",uuid);
+                    logLock("ACQUIRED",request.conversationId());
 
                     try{
-                      return runAgentLoop(uuid, userMessage);
+                      return runAgentLoop(request);
 
                     }finally {
-                        logLock("FINISHED", uuid);
+                        logLock("FINISHED", request.conversationId());
                     }
                 }
         );
     }
 
+    private LlmProfiles choiceLlm(ChatRequest request) {
+        String model = request.model();
+
+        if (model == null || model.isBlank()) {
+            model = "qwen3.5:4b";
+        }
+
+        boolean think = request.think() == null || request.think();
+
+        return llmProfileService.createLlmProfiles(model, think);
+    }
+
     private AgentExecutionResult runAgentLoop(
-            UUID uuid,
-            String userMessage
+            ChatRequest request
     ) {
+        String userMessage = request.message();
+        UUID uuid = request.conversationId();
+
+
         AgentExecutionBudget agentExecutionBudget = new AgentExecutionBudget(6,4);
         List<ToolExecutionResult> toolExecutionResultList = new ArrayList<>();
         boolean hasToolCalling = true;
@@ -77,6 +96,7 @@ public class AgentService {
 
         OllamaMessageDto newMessage = MessageFactory.createUserMessageDto(userMessage);
         messageService.saveMessages(uuid, newMessage);
+        LlmProfiles llmProfiles = choiceLlm(request);
 
         System.out.println("-------start-----------");
         agentExecutionBudget.printLoopLimits();
@@ -87,10 +107,10 @@ public class AgentService {
 
             if (agentExecutionBudget.getRemainingIterations() <= 0) {
                 AgentTerminationReason reason = AgentTerminationReason.ITERATION_LIMIT_REACHED;
-                return finishAfterLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget,reason);
+                return finishAfterLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget,reason,llmProfiles.finalProfile());
             }
 
-            OllamaChatRequest ollamaChatRequestWithTool = requestFactory.createRequestWithTool(messages);
+            OllamaChatRequest ollamaChatRequestWithTool = requestFactory.createRequestWithTool(messages, llmProfiles.agentProfile());
 
             agentExecutionBudget.loopStep();
 
@@ -103,7 +123,7 @@ public class AgentService {
                 System.out.println("Empty final response. Retrying without tools.");
 
                 response = agentMessage(
-                        requestFactory.createLastBaseRequest(messages)
+                        requestFactory.createLastBaseRequest(messages, llmProfiles.finalProfile())
                 );
 
                 if (hasToolCalling(response)
@@ -126,7 +146,7 @@ public class AgentService {
 
                     if (toolExecutionResult.status() == ToolExecutionStatus.SKIPPED){
                         AgentTerminationReason reason = AgentTerminationReason.TOOL_LIMIT_REACHED;
-                        return finishAfterLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget,reason);
+                        return finishAfterLimit(uuid,messages,toolExecutionResultList,agentExecutionBudget,reason,llmProfiles.finalProfile());
                     }
                 }
             }
@@ -178,7 +198,7 @@ public class AgentService {
 
     }
 
-    private AgentExecutionResult finishAfterLimit(UUID uuid, List<OllamaMessageDto> messages, List<ToolExecutionResult> toolExecutionResultList, AgentExecutionBudget agentExecutionBudget, AgentTerminationReason reason){
+    private AgentExecutionResult finishAfterLimit(UUID uuid, List<OllamaMessageDto> messages, List<ToolExecutionResult> toolExecutionResultList, AgentExecutionBudget agentExecutionBudget, AgentTerminationReason reason, LlmProfile llmProfile){
 
         OllamaMessageDto iterationMessage = null;
 
@@ -193,7 +213,7 @@ public class AgentService {
 
         messages.add(iterationMessage);
 
-        OllamaChatRequest ollamaChatRequest = requestFactory.createLastBaseRequest(messages);
+        OllamaChatRequest ollamaChatRequest = requestFactory.createLastBaseRequest(messages,llmProfile);
 
         OllamaChatResponse response = agentMessage(ollamaChatRequest);
         messageService.saveMessages(uuid, response.message());

@@ -1,5 +1,6 @@
 package dev.rehm.lingua.factory;
 
+import dev.rehm.lingua.domain.LlmProfile;
 import dev.rehm.lingua.dto.OllamaMessageDto;
 import dev.rehm.lingua.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.dto.request.RequestOption;
@@ -17,51 +18,57 @@ import java.util.Map;
 @Component
 public class RequestFactory {
 
-    private  final MessageService messageService;
+
     private final ToolRegistry toolRegistry;
-    private static final String model = "qwen3.5:4b";
     private final OllamaMessageDto systemMessage;
 
     public RequestFactory(MessageService messageService, ToolRegistry toolRegistry) {
-        this.messageService = messageService;
         this.toolRegistry = toolRegistry;
         this.systemMessage = messageService.firstSystemMessage();
     }
 
 
-    public  @NotNull OllamaChatRequest createBaseRequest(List<OllamaMessageDto> messages) {
+    public  @NotNull OllamaChatRequest createBaseRequest(List<OllamaMessageDto> messages, LlmProfile llmProfile) {
 
         List<OllamaMessageDto> messageDtos = new ArrayList<>();
         messageDtos.add(systemMessage);
         messageDtos.addAll(messages);
-        RequestOption options = new RequestOption(8192, 4096, 0.2, 0.9, 0.3, 40, 1.1);
+        RequestOption options =
+                new RequestOption(llmProfile.getNumCtx(),
+                        llmProfile.getNumPredict(),
+                        llmProfile.getTemperature(),
+                        llmProfile.getTopP(),
+                        llmProfile.getMinP(),
+                        llmProfile.getTopK(),
+                        llmProfile.getRepeatPenalty());
 
-        return new OllamaChatRequest(model, messageDtos, new ArrayList<>(), null, options, false, true, -1);
+        return new OllamaChatRequest(llmProfile.getModel(), messageDtos, new ArrayList<>(), null, options, false, llmProfile.isThink(), -1);
     }
 
-    public  @NotNull OllamaChatRequest createLastBaseRequest(List<OllamaMessageDto> messages) {
+    public  @NotNull OllamaChatRequest createLastBaseRequest(List<OllamaMessageDto> messages,LlmProfile llmProfile) {
 
         List<OllamaMessageDto> messageDtos = new ArrayList<>();
         messageDtos.add(systemMessage);
         messageDtos.addAll(messages);
-        RequestOption options = new RequestOption(8192, 512, 0.2, 0.9, 0.3, 40, 1.1);
+        RequestOption options =
+                new RequestOption(llmProfile.getNumCtx(),
+                        llmProfile.getNumPredict(),
+                        llmProfile.getTemperature(),
+                        llmProfile.getTopP(),
+                        llmProfile.getMinP(),
+                        llmProfile.getTopK(),
+                        llmProfile.getRepeatPenalty());
 
-        return new OllamaChatRequest(model, messageDtos, new ArrayList<>(), null, options, false, false, -1);
+        return new OllamaChatRequest(llmProfile.getModel(), messageDtos, new ArrayList<>(), null, options, false,llmProfile.isThink(), -1);
     }
 
 
-    public  @NotNull OllamaChatRequest createRequestWithTool(List<OllamaMessageDto> messages) {
-        OllamaChatRequest request =createBaseRequest(messages);
+    public  @NotNull OllamaChatRequest createRequestWithTool(List<OllamaMessageDto> messages, LlmProfile llmProfile) {
+        OllamaChatRequest request =createBaseRequest(messages, llmProfile);
         request.tools().addAll(findToolsToRequest());
 
         return request;
 
-    }
-
-    public  @NotNull OllamaChatRequest addToolsToRequest(OllamaChatRequest request) {
-        request.tools().addAll(findToolsToRequest());
-
-        return request;
     }
 
     private @NotNull List<RequestTool> findToolsToRequest() {

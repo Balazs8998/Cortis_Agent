@@ -12,7 +12,7 @@ import java.net.SocketTimeoutException;
 import java.time.Instant;
 
 @Component
-public class OllamaClient {
+public class OllamaClient implements ClientInterface<OllamaChatRequest, OllamaChatResponse> {
 
     private final RestClient client;
 
@@ -20,8 +20,8 @@ public class OllamaClient {
         this.client = client;
     }
 
-
-    public OllamaChatResponse sendMessage(OllamaChatRequest request){
+    public OllamaChatResponse sendMessageToClient(
+            OllamaChatRequest request) {
 
         try {
             return client.post()
@@ -32,9 +32,11 @@ public class OllamaClient {
 
         } catch (ResourceAccessException e) {
 
-            if (e.getMostSpecificCause() instanceof SocketTimeoutException) {
+            if (e.getMostSpecificCause()
+                    instanceof SocketTimeoutException) {
+
                 throw new OllamaTimeoutException(
-                        "sendChatRequest",
+                        "sendMessageToClient",
                         "ollamaUrl",
                         "ollama-api/chat"
                 );
@@ -43,6 +45,5 @@ public class OllamaClient {
             throw e;
         }
     }
-
 
 }

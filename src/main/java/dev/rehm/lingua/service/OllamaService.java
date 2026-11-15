@@ -19,7 +19,7 @@ public class OllamaService {
     }
 
     public OllamaChatResponse messageSend(OllamaChatRequest request) {
-        return client.sendMessage(request);
+        return client.sendMessageToClient(request);
     }
 
 

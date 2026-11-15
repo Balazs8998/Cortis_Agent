@@ -17,7 +17,7 @@ public record OllamaChatRequest(
         String format,
         RequestOption options,
         boolean stream,
-        boolean think,
+        Object think,
         @JsonProperty("keep_alive")
         Integer keepAlive
 ) {
