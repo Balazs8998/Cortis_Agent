@@ -1,9 +1,9 @@
 package dev.rehm.lingua.tool.calculator;
 
-import dev.rehm.lingua.argument.ArgumentHandler;
-import dev.rehm.lingua.dto.request.tool.ToolRequestFunction;
-import dev.rehm.lingua.dto.request.tool.ToolRequestParameters;
-import dev.rehm.lingua.dto.request.tool.ToolRequestProperties;
+import dev.rehm.lingua.tool.ArgumentHandler;
+import dev.rehm.lingua.tool.schema.ToolRequestFunction;
+import dev.rehm.lingua.tool.schema.ToolRequestParameters;
+import dev.rehm.lingua.tool.schema.ToolRequestProperties;
 import dev.rehm.lingua.tool.AgentTool;
 import org.springframework.stereotype.Component;
 

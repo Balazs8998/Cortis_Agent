@@ -1,5 +1,6 @@
 package dev.rehm.lingua.execution;
 
+import dev.rehm.lingua.agent.iteration.AgentExecutionBudget;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
