@@ -2,8 +2,6 @@ package dev.rehm.lingua.agent;
 
 import java.util.concurrent.*;
 
-import java.util.concurrent.atomic.AtomicLongArray;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -15,7 +13,6 @@ import dev.rehm.lingua.agent.inspection.AgentTerminationReason;
 import dev.rehm.lingua.agent.iteration.AgentExecutionBudget;
 import dev.rehm.lingua.conversation.ConversationService;
 import dev.rehm.lingua.conversation.MessageService;
-import dev.rehm.lingua.llm.LlmProfile;
 import dev.rehm.lingua.llm.LlmProfileService;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import dev.rehm.lingua.llm.LlmProfiles;
@@ -27,6 +24,7 @@ import dev.rehm.lingua.common.exception.classes.UnexpectedNullValueException;
 import dev.rehm.lingua.conversation.MessageFactory;
 import dev.rehm.lingua.llm.ollama.RequestFactory;
 import dev.rehm.lingua.llm.ollama.OllamaService;
+import dev.rehm.lingua.tool.ToolExecutionBatch;
 import dev.rehm.lingua.tool.ToolExecutionResult;
 import dev.rehm.lingua.tool.ToolExecutionStatus;
 import dev.rehm.lingua.tool.ToolExecutorService;
@@ -101,7 +99,7 @@ public class AgentService {
             executeAgentIteration(messages, context);
 
             if (context.getHasToolCalling()) {
-                context.addToolResults(toolCallingProcess(context.getUuid(), context.getResponse(), context.getAgentExecutionBudget()));
+                context.addToolResults(toolCallingProcess(context));
 
                 messages = new ArrayList<>(conversationService.getMessageList(context.getUuid()));
                 for (ToolExecutionResult toolExecutionResult : context.getResults()) {
@@ -284,14 +282,12 @@ public class AgentService {
     }
 
     private List<ToolExecutionResult> toolCallingProcess(
-            UUID uuid,
-            OllamaChatResponse response,
-            AgentExecutionBudget budget
+            AgentExecutionContext context
     ) {
         List<OllamaToolCallResponse> calls =
-                response.message().toolCalls();
+                context.getResponse().message().toolCalls();
 
-        int approved = budget.reserveBudget(calls.size());
+        int approved = context.getAgentExecutionBudget().reserveBudget(calls.size());
 
         List<ToolExecutionResult> results = new ArrayList<>();
 
@@ -301,38 +297,27 @@ public class AgentService {
 
         try {
 
-            long[] deadlinesNanos =
-                    new long[approved];
+            ToolExecutionBatch toolExecutionBatch = new ToolExecutionBatch(approved);
 
-            List<Future<ToolExecutionResult>> futures =
-                    new ArrayList<>();
-
-            AtomicReferenceArray<Instant> toolStartedAt =
-                    new AtomicReferenceArray<>(approved);
-
-            AtomicLongArray finishedAtNanos =
-                    new AtomicLongArray(approved);
-
-            AtomicReferenceArray<Thread> toolThreads =
-                    new AtomicReferenceArray<>(approved);
 
             for (int i = 0; i < approved; i++) {
                 OllamaToolCallResponse call = calls.get(i);
                 int index = i;
 
-                deadlinesNanos[i] = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                toolExecutionBatch.setDeadlinesNanos(i,deadline);
 
-                futures.add(
+                toolExecutionBatch.addFuture(
                         executor.submit(() -> {
-                            toolThreads.set(index, Thread.currentThread());
+                            toolExecutionBatch.setToolThread(index,Thread.currentThread());
                             Instant startedAt = Instant.now();
-                            toolStartedAt.set(index, startedAt);
+                            toolExecutionBatch.setToolStartedAt(index, startedAt);
 
 
                             try {
                                 return executorService.executeTool(call, index, startedAt);
                             } finally {
-                                finishedAtNanos.set(index, System.nanoTime());
+                                toolExecutionBatch.setFinishedAtNanos(index,System.nanoTime());
                             }
                         })
                 );
@@ -346,15 +331,15 @@ public class AgentService {
                     try {
 
                         long remainingNanos =
-                                deadlinesNanos[i] - System.nanoTime();
+                                toolExecutionBatch.getDeadlinesNanos(i) - System.nanoTime();
 
 
-                        result = futures.get(i).get(
+                        result = toolExecutionBatch.getFutures().get(i).get(
                                 Math.max(0, remainingNanos),
                                 TimeUnit.NANOSECONDS
                         );
 
-                        if (finishedAtNanos.get(i) - deadlinesNanos[i] > 0) {
+                        if (toolExecutionBatch.getFinishedAtNanos(i) - toolExecutionBatch.getDeadlinesNanos(i) > 0) {
                             throw new TimeoutException(
                                     "Tool completed after deadline"
                             );
@@ -363,28 +348,28 @@ public class AgentService {
                     } catch (TimeoutException e) {
 
                         long startNanos =
-                                deadlinesNanos[i] - TimeUnit.SECONDS.toNanos(5);
+                                toolExecutionBatch.getDeadlinesNanos(i) - TimeUnit.SECONDS.toNanos(5);
 
-                        long finishedNanos = finishedAtNanos.get(i);
+                        long finishedNanos = toolExecutionBatch.getFinishedAtNanos(i);
 
                         long endNanos = finishedNanos != 0L
                                 ? finishedNanos
-                                : Math.min(System.nanoTime(), deadlinesNanos[i]);
+                                : Math.min(System.nanoTime(), toolExecutionBatch.getDeadlinesNanos(i));
 
                         double durationMs =
                                 Math.max(0L, endNanos - startNanos) / 1_000_000.0;
 
-                        Instant executedAt = toolStartedAt.get(i);
+                        Instant executedAt = toolExecutionBatch.getToolStartedAt(i);
 
                         if (executedAt == null) {
                             executedAt = Instant.now();
                         }
 
-                        futures.get(i).cancel(true);
+                        toolExecutionBatch.getFutures().get(i).cancel(true);
 
                         OllamaToolCallResponse call = calls.get(i);
 
-                        Thread workerThread = toolThreads.get(i);
+                        Thread workerThread = toolExecutionBatch.getToolThreads(i);
 
                         Long threadId = workerThread == null
                                 ? null
@@ -407,7 +392,7 @@ public class AgentService {
                         );
 
                     } catch (InterruptedException e) {
-                        futures.forEach(f -> f.cancel(true));
+                        toolExecutionBatch.getFutures().forEach(f -> f.cancel(true));
                         Thread.currentThread().interrupt();
                         throw new IllegalStateException(
                                 "Tool execution interrupted", e
@@ -439,7 +424,7 @@ public class AgentService {
                 results.add(result);
 
                 messageService.createAndSaveToolMessage(
-                        uuid,
+                        context.getUuid(),
                         result.toolName(),
                         result.status() == ToolExecutionStatus.SUCCES
                                 ? result.result()
