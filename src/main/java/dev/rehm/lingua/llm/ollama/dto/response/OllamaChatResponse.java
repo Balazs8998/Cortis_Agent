@@ -10,6 +10,12 @@ public record OllamaChatResponse(
         @JsonProperty("done_reason")
         String doneReason,
         @JsonProperty("eval_count")
-        Integer evalCount
+        Integer evalCount,
+        @JsonProperty("prompt_eval_count")
+         Long promptEvalCount,
+        @JsonProperty("eval_duration")
+         Long evalDuration
+
+
 ) {
 }

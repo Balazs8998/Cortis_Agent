@@ -40,7 +40,10 @@ public class OllamaController {
                 answer.failed(),
                 answer.agentTerminationReason(),
                 answer.agentResponseIssues(),
-                answer.response().doneReason()
+                answer.response().doneReason(),
+                answer.response().evalCount(),
+                answer.response().promptEvalCount(),
+                answer.response().evalDuration()
         );
 
         return ResponseEntity.ok(response);
