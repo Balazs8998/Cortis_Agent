@@ -13,14 +13,13 @@ public class ToolExecutionBatch {
     private final AtomicReferenceArray<Instant> toolStartedAt;
     private final AtomicLongArray finishedAtNanos;
     private final AtomicReferenceArray<Thread> toolThreads;
-    private final List<Future<ToolExecutionResult>> futures;
+    private final List<Future<ToolExecutionResult>> futures = new ArrayList<>();
 
     public ToolExecutionBatch(int approved) {
         this.deadlinesNanos = new long[approved];
         this.toolStartedAt = new AtomicReferenceArray<>(approved);
         this.finishedAtNanos = new AtomicLongArray(approved);
         this.toolThreads = new AtomicReferenceArray<>(approved);
-        futures = new ArrayList<>();
     }
 
 
@@ -30,7 +29,11 @@ public class ToolExecutionBatch {
     }
 
 
-    public List<Future<ToolExecutionResult>> getFutures() {
+    public Future<ToolExecutionResult> getFuture(int index) {
+        return this.futures.get(index) ;
+    }
+
+    public List<Future<ToolExecutionResult>> getFutures(){
         return List.copyOf(futures);
     }
 

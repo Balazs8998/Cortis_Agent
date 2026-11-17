@@ -93,7 +93,7 @@ public class AgentService {
 
             if (context.getAgentExecutionBudget().getRemainingIterations() <= 0) {
                 AgentTerminationReason reason = AgentTerminationReason.ITERATION_LIMIT_REACHED;
-                return finishAfterLimit( messages, reason, context);
+                return finishAfterLimit(messages, reason, context);
             }
 
             executeAgentIteration(messages, context);
@@ -106,7 +106,8 @@ public class AgentService {
 
                     if (toolExecutionResult.status() == ToolExecutionStatus.SKIPPED) {
                         AgentTerminationReason reason = AgentTerminationReason.TOOL_LIMIT_REACHED;
-                        return finishAfterLimit( messages, reason, context);                    }
+                        return finishAfterLimit(messages, reason, context);
+                    }
                 }
             }
         }
@@ -228,7 +229,6 @@ public class AgentService {
         );
 
 
-
         messageService.soutMessageList(conversationService.getMessageList(context.getUuid()));
         logIterationBudget(context);
         System.out.println("-------end-----------");
@@ -281,6 +281,132 @@ public class AgentService {
         );
     }
 
+
+    private void executeMultiTool(ExecutorService executor, ToolExecutionBatch toolExecutionBatch,
+                                  List<OllamaToolCallResponse> calls, int approved) {
+
+        for (int i = 0; i < approved; i++) {
+            OllamaToolCallResponse call = calls.get(i);
+            int index = i;
+
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            toolExecutionBatch.setDeadlinesNanos(i, deadline);
+
+            toolExecutionBatch.addFuture(
+                    executor.submit(() -> {
+                        toolExecutionBatch.setToolThread(index, Thread.currentThread());
+                        Instant startedAt = Instant.now();
+                        toolExecutionBatch.setToolStartedAt(index, startedAt);
+
+
+                        try {
+                            return executorService.executeTool(call, index, startedAt);
+                        } finally {
+                            toolExecutionBatch.setFinishedAtNanos(index, System.nanoTime());
+                        }
+                    })
+            );
+        }
+    }
+
+    private ToolExecutionResult executeResult(ToolExecutionBatch toolExecutionBatch,
+                                              int index) throws TimeoutException, ExecutionException, InterruptedException {
+
+        long remainingNanos =
+                toolExecutionBatch.getDeadlinesNanos(index) - System.nanoTime();
+
+
+        ToolExecutionResult result = toolExecutionBatch.getFuture(index).get(
+                Math.max(0, remainingNanos),
+                TimeUnit.NANOSECONDS
+        );
+
+        if (toolExecutionBatch.getFinishedAtNanos(index) - toolExecutionBatch.getDeadlinesNanos(index) > 0) {
+            throw new TimeoutException(
+                    "Tool completed after deadline"
+            );
+        }
+
+        return result;
+    }
+
+    private ToolExecutionResult createSkippedResult(List<OllamaToolCallResponse> calls,int index){
+        OllamaToolCallResponse call = calls.get(index);
+
+        return new ToolExecutionResult(
+                call.function().name(),
+                call.function().arguments(),
+                "Tool limit reached",
+                ToolExecutionStatus.SKIPPED,
+                Instant.now(),
+                0,
+                null,
+                false,
+                index
+        );
+    }
+
+    private void saveToolExecutionMessage(AgentExecutionContext context, ToolExecutionResult result){
+        messageService.createAndSaveToolMessage(
+                context.getUuid(),
+                result.toolName(),
+                result.status() == ToolExecutionStatus.SUCCES
+                        ? result.result()
+                        : result.status() + ": " + result.result()
+        );
+
+    }
+
+
+
+    private ToolExecutionResult createTimeoutResult(List<OllamaToolCallResponse> calls,
+                                                    ToolExecutionBatch toolExecutionBatch, int index) {
+        long startNanos =
+                toolExecutionBatch.getDeadlinesNanos(index) - TimeUnit.SECONDS.toNanos(5);
+
+        long finishedNanos = toolExecutionBatch.getFinishedAtNanos(index);
+
+        long endNanos = finishedNanos != 0L
+                ? finishedNanos
+                : Math.min(System.nanoTime(), toolExecutionBatch.getDeadlinesNanos(index));
+
+        double durationMs =
+                Math.max(0L, endNanos - startNanos) / 1_000_000.0;
+
+        Instant executedAt = toolExecutionBatch.getToolStartedAt(index);
+
+        if (executedAt == null) {
+            executedAt = Instant.now();
+        }
+
+        toolExecutionBatch.getFuture(index).cancel(true);
+
+        OllamaToolCallResponse call = calls.get(index);
+
+        Thread workerThread = toolExecutionBatch.getToolThreads(index);
+
+        Long threadId = workerThread == null
+                ? null
+                : workerThread.threadId();
+
+        boolean isVirtual = workerThread != null
+                && workerThread.isVirtual();
+
+
+        return new ToolExecutionResult(
+                call.function().name(),
+                call.function().arguments(),
+                "Tool execution timed out",
+                ToolExecutionStatus.TIMEOUT,
+                executedAt,
+                durationMs,
+                threadId,
+                isVirtual,
+                index
+        );
+    }
+
+
     private List<ToolExecutionResult> toolCallingProcess(
             AgentExecutionContext context
     ) {
@@ -288,40 +414,14 @@ public class AgentService {
                 context.getResponse().message().toolCalls();
 
         int approved = context.getAgentExecutionBudget().reserveBudget(calls.size());
-
         List<ToolExecutionResult> results = new ArrayList<>();
-
 
         ExecutorService executor =
                 Executors.newVirtualThreadPerTaskExecutor();
 
         try {
-
             ToolExecutionBatch toolExecutionBatch = new ToolExecutionBatch(approved);
-
-
-            for (int i = 0; i < approved; i++) {
-                OllamaToolCallResponse call = calls.get(i);
-                int index = i;
-
-                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-                toolExecutionBatch.setDeadlinesNanos(i,deadline);
-
-                toolExecutionBatch.addFuture(
-                        executor.submit(() -> {
-                            toolExecutionBatch.setToolThread(index,Thread.currentThread());
-                            Instant startedAt = Instant.now();
-                            toolExecutionBatch.setToolStartedAt(index, startedAt);
-
-
-                            try {
-                                return executorService.executeTool(call, index, startedAt);
-                            } finally {
-                                toolExecutionBatch.setFinishedAtNanos(index,System.nanoTime());
-                            }
-                        })
-                );
-            }
+            executeMultiTool(executor, toolExecutionBatch, calls, approved);
 
             for (int i = 0; i < calls.size(); i++) {
 
@@ -330,66 +430,11 @@ public class AgentService {
                 if (i < approved) {
                     try {
 
-                        long remainingNanos =
-                                toolExecutionBatch.getDeadlinesNanos(i) - System.nanoTime();
-
-
-                        result = toolExecutionBatch.getFutures().get(i).get(
-                                Math.max(0, remainingNanos),
-                                TimeUnit.NANOSECONDS
-                        );
-
-                        if (toolExecutionBatch.getFinishedAtNanos(i) - toolExecutionBatch.getDeadlinesNanos(i) > 0) {
-                            throw new TimeoutException(
-                                    "Tool completed after deadline"
-                            );
-                        }
+                        result = executeResult(toolExecutionBatch, i);
 
                     } catch (TimeoutException e) {
 
-                        long startNanos =
-                                toolExecutionBatch.getDeadlinesNanos(i) - TimeUnit.SECONDS.toNanos(5);
-
-                        long finishedNanos = toolExecutionBatch.getFinishedAtNanos(i);
-
-                        long endNanos = finishedNanos != 0L
-                                ? finishedNanos
-                                : Math.min(System.nanoTime(), toolExecutionBatch.getDeadlinesNanos(i));
-
-                        double durationMs =
-                                Math.max(0L, endNanos - startNanos) / 1_000_000.0;
-
-                        Instant executedAt = toolExecutionBatch.getToolStartedAt(i);
-
-                        if (executedAt == null) {
-                            executedAt = Instant.now();
-                        }
-
-                        toolExecutionBatch.getFutures().get(i).cancel(true);
-
-                        OllamaToolCallResponse call = calls.get(i);
-
-                        Thread workerThread = toolExecutionBatch.getToolThreads(i);
-
-                        Long threadId = workerThread == null
-                                ? null
-                                : workerThread.threadId();
-
-                        boolean isVirtual = workerThread != null
-                                && workerThread.isVirtual();
-
-
-                        result = new ToolExecutionResult(
-                                call.function().name(),
-                                call.function().arguments(),
-                                "Tool execution timed out",
-                                ToolExecutionStatus.TIMEOUT,
-                                executedAt,
-                                durationMs,
-                                threadId,
-                                isVirtual,
-                                i
-                        );
+                        result = createTimeoutResult(calls, toolExecutionBatch, i);
 
                     } catch (InterruptedException e) {
                         toolExecutionBatch.getFutures().forEach(f -> f.cancel(true));
@@ -404,32 +449,11 @@ public class AgentService {
                                 e.getCause()
                         );
                     }
-
                 } else {
-                    OllamaToolCallResponse call = calls.get(i);
-
-                    result = new ToolExecutionResult(
-                            call.function().name(),
-                            call.function().arguments(),
-                            "Tool limit reached",
-                            ToolExecutionStatus.SKIPPED,
-                            Instant.now(),
-                            0,
-                            null,
-                            false,
-                            i
-                    );
+                    result = createSkippedResult(calls,i);
                 }
-
                 results.add(result);
-
-                messageService.createAndSaveToolMessage(
-                        context.getUuid(),
-                        result.toolName(),
-                        result.status() == ToolExecutionStatus.SUCCES
-                                ? result.result()
-                                : result.status() + ": " + result.result()
-                );
+                saveToolExecutionMessage(context,result);
             }
         } finally {
             executor.shutdownNow();
