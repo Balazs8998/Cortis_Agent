@@ -2,6 +2,8 @@ package dev.rehm.lingua.llm.ollama.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 public record OllamaChatResponse(
         String model,

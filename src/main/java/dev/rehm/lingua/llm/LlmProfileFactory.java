@@ -85,7 +85,7 @@ public final class LlmProfileFactory {
                 numPredict,
                 temperature,
                 topP,
-                0.0,  // minP
+                0.0,
                 topK,
                 1.0   // repeatPenalty
         );

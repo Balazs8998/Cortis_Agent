@@ -1,6 +1,5 @@
 package dev.rehm.lingua.conversation;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import org.springframework.stereotype.Service;
 
@@ -10,7 +9,6 @@ import java.util.List;
 import java.util.UUID;
 
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class MessageService {
@@ -169,12 +167,12 @@ public class MessageService {
             """;
 
 
-    private final ConversationMemory memory;
+
     private final ObjectMapper objectMapper;
 
 
-    public MessageService(ConversationMemory memory, ObjectMapper objectMapper) {
-        this.memory = memory;
+    public MessageService(ObjectMapper objectMapper) {
+
         this.objectMapper = objectMapper;
     }
 
@@ -185,27 +183,6 @@ public class MessageService {
         );
     }
 
-    public void saveMessages(UUID uuid, OllamaMessageDto message) {
-        memory.addMessageToChat(uuid, message);
-    }
-
-    public void createAndSaveToolMessage(
-            UUID uuid,
-            String toolName,
-            Object result
-    ) {
-        String json = objectMapper.writeValueAsString(result);
-
-        OllamaMessageDto message = new OllamaMessageDto(
-                "tool",
-                toolName,
-                json,
-                null
-        );
-
-        saveMessages(uuid, message);
-
-    }
 
     public OllamaMessageDto firstSystemMessage() {
         return new OllamaMessageDto("system", null, buildSystemPrompt(), null);
@@ -218,6 +195,7 @@ public class MessageService {
         }
         System.out.println("------------------------------------");
     }
+
 
 
 }

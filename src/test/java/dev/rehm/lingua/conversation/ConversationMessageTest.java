@@ -21,18 +21,12 @@ class ConversationMessageTest {
     }
 
     private OllamaMessageDto createMessage(String content) {
-        return new OllamaMessageDto(
-                "user",
-                null,
-                content,
-                null
-        );
+        return new OllamaMessageDto("user", null, content, null);
     }
 
     @Test
     void shouldGenerateUuidWhenConversationIsCreated() {
         UUID uuid = conversation.getUuid();
-
         assertNotNull(uuid);
     }
 
@@ -45,7 +39,7 @@ class ConversationMessageTest {
     void shouldAddMessageToConversation() {
         OllamaMessageDto message = createMessage("hello");
 
-        conversation.addMessage(message);
+        conversation.addMessages(List.of(message));
 
         assertEquals(1, conversation.getMessages().size());
         assertSame(message, conversation.getMessages().getFirst());
@@ -53,7 +47,7 @@ class ConversationMessageTest {
 
     @Test
     void shouldReturnImmutableMessageSnapshot() {
-        conversation.addMessage(createMessage("hello"));
+        conversation.addMessages(List.of(createMessage("hello")));
 
         List<OllamaMessageDto> snapshot = conversation.getMessages();
 
@@ -62,7 +56,7 @@ class ConversationMessageTest {
                 () -> snapshot.add(createMessage("test"))
         );
 
-        conversation.addMessage(createMessage("second"));
+        conversation.addMessages(List.of(createMessage("second")));
 
         assertEquals(1, snapshot.size());
         assertEquals(2, conversation.getMessages().size());
@@ -70,10 +64,7 @@ class ConversationMessageTest {
 
     @Test
     void shouldReturnResultFromSerializedAction() {
-        String result = conversation.executeSerialized(
-                () -> "hello"
-        );
-
+        String result = conversation.executeSerialized(() -> "hello");
         assertEquals("hello", result);
     }
 
@@ -102,9 +93,8 @@ class ConversationMessageTest {
                     startSignal.await();
 
                     for (int j = 0; j < messagesPerThread; j++) {
-                        conversation.addMessage(createMessage("hello"));
+                        conversation.addMessages(List.of(createMessage("hello")));
                     }
-
                     return null;
                 }));
             }
@@ -119,7 +109,6 @@ class ConversationMessageTest {
                     threadCount * messagesPerThread,
                     conversation.getMessages().size()
             );
-
         } finally {
             startSignal.countDown();
             executor.shutdownNow();
@@ -157,7 +146,6 @@ class ConversationMessageTest {
 
             assertTrue(secondAttempting.await(2, TimeUnit.SECONDS));
 
-            // The first action still holds the lock.
             assertFalse(
                     secondEntered.await(200, TimeUnit.MILLISECONDS),
                     "Second action entered before the first finished"
@@ -168,7 +156,6 @@ class ConversationMessageTest {
             assertEquals("first", first.get(2, TimeUnit.SECONDS));
             assertEquals("second", second.get(2, TimeUnit.SECONDS));
             assertEquals(0, secondEntered.getCount());
-
         } finally {
             releaseFirst.countDown();
             executor.shutdownNow();

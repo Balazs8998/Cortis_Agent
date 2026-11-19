@@ -31,8 +31,8 @@ public class ConversationMessage {
     }
 
 
-    public synchronized void addMessage(OllamaMessageDto message){
-        this.messages.add(message);
+    public synchronized void addMessages(List<OllamaMessageDto> message){
+        this.messages.addAll(message);
     }
 
     public synchronized List<OllamaMessageDto> getMessages() {

@@ -23,6 +23,11 @@ public class AgentExecutionContext {
     private OllamaChatResponse response;
     private final OllamaMessageDto newMessage;
     private final LlmProfiles llmProfiles;
+    private boolean userMessageCommited;
+    private final List<OllamaMessageDto> pendingMessages =
+            new ArrayList<>();
+    private final List<OllamaMessageDto> committedHistory =
+            new ArrayList<>();
 
 
     public AgentExecutionContext(ChatRequest request,
@@ -36,6 +41,32 @@ public class AgentExecutionContext {
         this.response = null;
         this.newMessage = MessageFactory.createUserMessageDto(userMessage);
         this.llmProfiles = llmProfiles;
+        this.userMessageCommited = false;
+        addPendingMessage(newMessage);
+    }
+
+
+
+    public List<OllamaMessageDto> getMessagesForLlm() {
+
+        List<OllamaMessageDto> messagesForLlm =
+                new ArrayList<>(committedHistory);
+
+        messagesForLlm.addAll(pendingMessages);
+
+        return messagesForLlm;
+    }
+
+    public void setCommittedHistory(List<OllamaMessageDto> messageHistory){
+        this.committedHistory.addAll(messageHistory);
+    }
+
+    public void addPendingMessage(OllamaMessageDto message) {
+        pendingMessages.add(message);
+    }
+
+    public List<OllamaMessageDto> getPendingMessages() {
+        return List.copyOf(pendingMessages);
     }
 
     public void addToolResults(List<ToolExecutionResult> resultList){
@@ -78,5 +109,11 @@ public class AgentExecutionContext {
         return llmProfiles;
     }
 
+    public boolean isUserMessageCommited() {
+        return userMessageCommited;
+    }
 
+    public void setIsUserMessageCommited(boolean userMessageCommited) {
+        this.userMessageCommited = userMessageCommited;
+    }
 }

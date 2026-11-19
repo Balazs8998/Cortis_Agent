@@ -24,6 +24,10 @@ public class ConversationService {
         return conversationMessage.getUuid().toString();
     }
 
+    public void messageSave(UUID uuid, List<OllamaMessageDto> messageDtoList){
+        memory.addMessageToChat(uuid,messageDtoList);
+    }
+
     public List<OllamaMessageDto> getMessageList(UUID uuid){
         return memory.getMessageList(uuid);
     }

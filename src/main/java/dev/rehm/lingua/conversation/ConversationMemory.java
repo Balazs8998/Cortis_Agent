@@ -34,8 +34,8 @@ public class ConversationMemory {
         messageMap.put(message.getUuid(),message);
     }
 
-    public void addMessageToChat(UUID uuid, OllamaMessageDto message) {
-        getConversation(uuid).addMessage(message);
+    public void addMessageToChat(UUID uuid, List<OllamaMessageDto> messages) {
+        getConversation(uuid).addMessages(messages);
     }
 
     public List<OllamaMessageDto> getMessageList(UUID uuid) {

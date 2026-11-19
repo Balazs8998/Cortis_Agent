@@ -1,52 +1,35 @@
-
 package dev.rehm.lingua.conversation;
 
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class MessageServiceTest {
-
-    @Mock
-    private ConversationMemory memory;
-
-    @InjectMocks
-    private MessageService service;
 
     @Test
     void shouldDelegateMessageSavingToMemory() {
+        ConversationMemory memory = mock(ConversationMemory.class);
+        ConversationService service = new ConversationService(memory);
         UUID uuid = UUID.randomUUID();
 
         OllamaMessageDto message =
                 new OllamaMessageDto("user", null, "hello", null);
+        List<OllamaMessageDto> messages = List.of(message);
 
-        service.saveMessages(uuid, message);
+        service.messageSave(uuid, messages);
 
-        verify(memory).addMessageToChat(uuid, message);
+        verify(memory).addMessageToChat(uuid, messages);
     }
 
     @Test
-    void shouldCreateAndSaveToolMessage() {
-        UUID uuid = UUID.randomUUID();
-
-        service.createAndSaveToolMessage(uuid, "add", 42);
-
-        ArgumentCaptor<OllamaMessageDto> captor =
-                ArgumentCaptor.forClass(OllamaMessageDto.class);
-
-        verify(memory).addMessageToChat(eq(uuid), captor.capture());
-
-        OllamaMessageDto saved = captor.getValue();
+    void shouldCreateToolMessage() {
+        OllamaMessageDto saved = MessageFactory.createToolMessageDto("add", 42);
 
         assertEquals("tool", saved.role());
         assertEquals("add", saved.toolName());
@@ -56,20 +39,13 @@ class MessageServiceTest {
 
     @Test
     void shouldConvertNullToolResultToString() {
-        UUID uuid = UUID.randomUUID();
-
-        service.createAndSaveToolMessage(uuid, "add", null);
-
-        ArgumentCaptor<OllamaMessageDto> captor =
-                ArgumentCaptor.forClass(OllamaMessageDto.class);
-
-        verify(memory).addMessageToChat(eq(uuid), captor.capture());
-
-        assertEquals("null", captor.getValue().content());
+        OllamaMessageDto message = MessageFactory.createToolMessageDto("add", null);
+        assertEquals("null", message.content());
     }
 
     @Test
     void shouldCreateSystemMessageWithConfiguredPrompt() {
+        MessageService service = new MessageService(JsonMapper.builder().build());
         OllamaMessageDto message = service.firstSystemMessage();
 
         assertNotNull(message);
@@ -77,7 +53,7 @@ class MessageServiceTest {
         assertNull(message.toolName());
         assertNull(message.toolCalls());
 
-        assertTrue(message.content().contains("Your name is CORTIS."));
-        assertTrue(message.content().contains("Tool usage rules:"));
+        assertTrue(message.content().contains("You are CORTIS"));
+        assertTrue(message.content().contains("Tools and Capabilities"));
     }
 }
