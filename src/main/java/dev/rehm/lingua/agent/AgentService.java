@@ -191,7 +191,7 @@ public class AgentService {
             );
         }
 
-        if(!response.done() && request.stream()){
+        if(!response.done()){
             throw new AgentProcessFailedException(
                     "addMessage",
                     "boolean done",
