@@ -2,6 +2,7 @@ package dev.rehm.lingua.agent;
 
 import dev.rehm.lingua.agent.inspection.AgentExecutionResult;
 import dev.rehm.lingua.chat.dto.ChatRequest;
+import dev.rehm.lingua.common.exception.classes.AgentEmptyFinalResponseException;
 import dev.rehm.lingua.conversation.ConversationMemory;
 import dev.rehm.lingua.conversation.ConversationService;
 import dev.rehm.lingua.conversation.MessageService;
@@ -299,7 +300,7 @@ class AgentServiceTest {
         when(ollamaService.messageSend(any(OllamaChatRequest.class)))
                 .thenReturn(finalResponse(""), finalResponse(""));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(AgentEmptyFinalResponseException.class,
                 () -> agentService.executeAgentLoop(chatRequest));
 
         assertTrue(conversationService.getMessageList(conversationId).isEmpty());
