@@ -257,8 +257,8 @@ public class GlobalExceptionHandler {
         for (FieldError fieldError : fieldErrors) {
 
             validationError.addFieldError(
-                    fieldError.getDefaultMessage(),
                     fieldError.getField(),
+                    fieldError.getDefaultMessage(),
                     fieldError.getCode()
             );
         }

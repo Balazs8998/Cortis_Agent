@@ -14,7 +14,6 @@ public class ValidationError {
 
     public record FieldErrorDTO(
             String field,
-
             String message,
             String code
     ) {
