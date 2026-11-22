@@ -56,7 +56,7 @@ public class ToolExecutorService {
 
                         result = executeResult(toolExecutionBatch, i);
 
-                    }catch (TimeoutException e) {
+                    } catch (TimeoutException e) {
                         toolExecutionBatch.getFuture(i).cancel(true);
 
                         result = createErrorResult(
@@ -65,7 +65,7 @@ public class ToolExecutorService {
                                 "Tool execution timed out"
                         );
 
-                    }catch (InterruptedException e) {
+                    } catch (InterruptedException e) {
                         toolExecutionBatch.getFutures().forEach(f -> f.cancel(true));
                         Thread.currentThread().interrupt();
                         throw new IllegalStateException(
@@ -80,7 +80,7 @@ public class ToolExecutorService {
                         );
                     }
                 } else {
-                    result = createSkippedResult(calls, i);
+                    result = createRejectedResult(calls, i);
                 }
                 results.add(result);
                 saveToolExecutionMessage(context, result);
@@ -91,7 +91,6 @@ public class ToolExecutorService {
 
         return results;
     }
-
 
 
     public Object choiceTool(OllamaToolCallResponse toolCall) {
@@ -153,7 +152,7 @@ public class ToolExecutorService {
 
         } catch (Exception e) {
 
-            log.debug(e.getMessage(),e);
+            log.debug(e.getMessage(), e);
 
             return new ToolExecutionResult(
                     toolName,
@@ -219,9 +218,8 @@ public class ToolExecutorService {
     }
 
 
-
     private void saveToolExecutionMessage(AgentExecutionContext context, ToolExecutionResult result) {
-        OllamaMessageDto toolMessage = MessageFactory.createToolMessageDto(result.toolName(),result);
+        OllamaMessageDto toolMessage = MessageFactory.createToolMessageDto(result.toolName(), result);
 
         context.addPendingMessage(toolMessage);
 
@@ -236,6 +234,41 @@ public class ToolExecutorService {
                 call.function().arguments(),
                 "Tool limit reached",
                 ToolExecutionStatus.SKIPPED,
+                Instant.now(),
+                0,
+                null,
+                false,
+                index
+        );
+    }
+
+    private ToolExecutionResult createRejectedResult(
+            List<OllamaToolCallResponse> calls,
+            int index
+    ) {
+        OllamaToolCallResponse call = calls.get(index);
+
+        if (call == null || call.function() == null
+                || call.function().name() == null
+                || call.function().name().isBlank()) {
+
+            return createFailedResult(
+                    calls,
+                    index
+            );
+        }
+
+        return createSkippedResult(calls, index);
+    }
+
+    private ToolExecutionResult createFailedResult(List<OllamaToolCallResponse> calls, int index) {
+        OllamaToolCallResponse call = calls.get(index);
+
+        return new ToolExecutionResult(
+                "UNKNOW",
+                null,
+                "Tool functions not found",
+                ToolExecutionStatus.FAILED,
                 Instant.now(),
                 0,
                 null,
@@ -269,7 +302,6 @@ public class ToolExecutorService {
                 index
         );
     }
-
 
 
 }

@@ -1,5 +1,7 @@
 package dev.rehm.lingua.agent;
 
+import dev.rehm.lingua.agent.context.AgentExecutionContext;
+import dev.rehm.lingua.agent.message.MessageFactory;
 import dev.rehm.lingua.agent.inspection.AgentExecutionResult;
 import dev.rehm.lingua.chat.dto.ChatRequest;
 import dev.rehm.lingua.common.exception.classes.AgentEmptyFinalResponseException;
@@ -90,15 +92,15 @@ class AgentServiceTest {
         stubSuccessfulTools();
         when(ollamaService.messageSend(any(OllamaChatRequest.class)))
                 .thenReturn(toolCallResponse("first_tool"),
-                            toolCallResponse("second_tool"),
-                            finalResponse("Done"));
+                        toolCallResponse("second_tool"),
+                        finalResponse("Done"));
 
         AgentExecutionResult result = agentService.executeAgentLoop(chatRequest);
 
         assertNotNull(result);
         verify(ollamaService, times(3)).messageSend(any(OllamaChatRequest.class));
         verify(executorService, times(2))
-                .executeTool(any(OllamaToolCallResponse.class), anyInt(), any(Instant.class));
+                .toolCallingProcess(any(AgentExecutionContext.class));
 
         List<OllamaMessageDto> committed = captureSingleCommit();
         assertEquals(committed, conversationService.getMessageList(conversationId));
@@ -115,8 +117,8 @@ class AgentServiceTest {
         stubSuccessfulTools();
         when(ollamaService.messageSend(any(OllamaChatRequest.class)))
                 .thenReturn(toolCallResponse("first_tool"),
-                            toolCallResponse("second_tool"),
-                            finalResponse("Done"));
+                        toolCallResponse("second_tool"),
+                        finalResponse("Done"));
 
         agentService.executeAgentLoop(chatRequest);
 
@@ -180,7 +182,8 @@ class AgentServiceTest {
 
     @Test
     void shouldNotPublishHalfBatchWhenSecondToolDtoIsMalformed() {
-        stubSuccessfulTools();
+        when(executorService.toolCallingProcess(any(AgentExecutionContext.class)))
+                .thenThrow(new IllegalStateException("Malformed tool batch"));
         OllamaToolCallResponse valid = new OllamaToolCallResponse(
                 "function", new OllamaToolResponseFunction(0, "first_tool", Map.of("value", 1))
         );
@@ -201,8 +204,26 @@ class AgentServiceTest {
 
     @Test
     void shouldStoreFailedToolReplyAndStillCommitCompleteTurn() {
-        when(executorService.executeTool(any(OllamaToolCallResponse.class), anyInt(), any(Instant.class)))
-                .thenThrow(new IllegalArgumentException("Simulated invalid tool DTO"));
+        when(executorService.toolCallingProcess(any(AgentExecutionContext.class)))
+                .thenAnswer(invocation -> {
+                    AgentExecutionContext context = invocation.getArgument(0);
+                    OllamaToolCallResponse call = context.getResponse().message().toolCalls().get(0);
+                    context.getAgentExecutionBudget().reserveBudget(1);
+
+                    ToolExecutionResult failed = new ToolExecutionResult(
+                            call.function().name(),
+                            call.function().arguments(),
+                            "Simulated invalid tool arguments",
+                            ToolExecutionStatus.FAILED,
+                            Instant.now(),
+                            1.0,
+                            Thread.currentThread().threadId(),
+                            Thread.currentThread().isVirtual(),
+                            0
+                    );
+                    context.addPendingMessage(MessageFactory.createToolMessageDto(failed.toolName(), failed));
+                    return List.of(failed);
+                });
         when(ollamaService.messageSend(any(OllamaChatRequest.class)))
                 .thenReturn(toolCallResponse("invalid_tool"), finalResponse("Partial information"));
 
@@ -223,8 +244,8 @@ class AgentServiceTest {
         stubFinalRequestFactory();
         when(ollamaService.messageSend(any(OllamaChatRequest.class)))
                 .thenReturn(toolCallResponse("tool_1", "tool_2", "tool_3", "tool_4",
-                                             "tool_5", "tool_6", "tool_7"),
-                            finalResponse("Tool limit reached"));
+                                "tool_5", "tool_6", "tool_7"),
+                        finalResponse("Tool limit reached"));
 
         agentService.executeAgentLoop(chatRequest);
 
@@ -239,8 +260,8 @@ class AgentServiceTest {
         assertEquals(1, toolReplies.stream()
                 .filter(m -> m.content().contains("\"status\":\"SKIPPED\"")).count());
         assertEquals("assistant", committed.get(committed.size() - 1).role());
-        verify(executorService, times(6))
-                .executeTool(any(OllamaToolCallResponse.class), anyInt(), any(Instant.class));
+        verify(executorService, times(1))
+                .toolCallingProcess(any(AgentExecutionContext.class));
 
         List<OllamaChatRequest> requests = captureRequests(2);
         assertTrue(requests.get(1).tools().isEmpty(),
@@ -277,8 +298,8 @@ class AgentServiceTest {
         stubFinalRequestFactory();
         when(ollamaService.messageSend(any(OllamaChatRequest.class)))
                 .thenReturn(toolCallResponse("tool_1", "tool_2", "tool_3", "tool_4",
-                                             "tool_5", "tool_6", "tool_7"),
-                            finalResponse("Budget exhausted"));
+                                "tool_5", "tool_6", "tool_7"),
+                        finalResponse("Budget exhausted"));
 
         agentService.executeAgentLoop(chatRequest);
 
@@ -287,8 +308,8 @@ class AgentServiceTest {
             assertEquals(1, countUserMessage(request.messages(), "Earlier question"),
                     "Previous user turn must occur exactly once");
             assertEquals(1, request.messages().stream()
-                    .filter(m -> "assistant".equals(m.role())
-                            && "Earlier answer".equals(m.content())).count(),
+                            .filter(m -> "assistant".equals(m.role())
+                                    && "Earlier answer".equals(m.content())).count(),
                     "Previous assistant turn must occur exactly once");
             assertEquals(1, countUserMessage(request.messages(), "Hello Cortis"));
         }
@@ -311,22 +332,34 @@ class AgentServiceTest {
     // ---- Reusable stubs / assertions ----
 
     private void stubSuccessfulTools() {
-        when(executorService.executeTool(any(OllamaToolCallResponse.class), anyInt(), any(Instant.class)))
+        when(executorService.toolCallingProcess(any(AgentExecutionContext.class)))
                 .thenAnswer(invocation -> {
-                    OllamaToolCallResponse call = invocation.getArgument(0);
-                    int index = invocation.getArgument(1);
-                    Instant startedAt = invocation.getArgument(2);
-                    return new ToolExecutionResult(
-                            call.function().name(),
-                            call.function().arguments(),
-                            "Tool completed",
-                            ToolExecutionStatus.SUCCES,
-                            startedAt,
-                            1.0,
-                            Thread.currentThread().threadId(),
-                            Thread.currentThread().isVirtual(),
-                            index
-                    );
+                    AgentExecutionContext context = invocation.getArgument(0);
+                    List<OllamaToolCallResponse> calls = context.getResponse().message().toolCalls();
+                    int approved = context.getAgentExecutionBudget().reserveBudget(calls.size());
+                    List<ToolExecutionResult> results = new ArrayList<>();
+
+                    for (int i = 0; i < calls.size(); i++) {
+                        OllamaToolCallResponse call = calls.get(i);
+                        boolean skipped = i >= approved;
+
+                        ToolExecutionResult result = new ToolExecutionResult(
+                                call.function().name(),
+                                call.function().arguments(),
+                                skipped ? "Tool limit reached" : "Tool completed",
+                                skipped ? ToolExecutionStatus.SKIPPED : ToolExecutionStatus.SUCCES,
+                                Instant.now(),
+                                skipped ? 0.0 : 1.0,
+                                skipped ? null : Thread.currentThread().threadId(),
+                                !skipped && Thread.currentThread().isVirtual(),
+                                i
+                        );
+                        results.add(result);
+                        context.addPendingMessage(
+                                MessageFactory.createToolMessageDto(result.toolName(), result)
+                        );
+                    }
+                    return results;
                 });
     }
 

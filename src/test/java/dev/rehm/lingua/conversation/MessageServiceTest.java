@@ -47,7 +47,7 @@ class MessageServiceTest {
 
     @Test
     void shouldCreateSystemMessageWithConfiguredPrompt() {
-        MessageService service = new MessageService(JsonMapper.builder().build());
+        MessageService service = new MessageService();
         OllamaMessageDto message = service.firstSystemMessage();
 
         assertNotNull(message);
