@@ -1,6 +1,6 @@
 package dev.rehm.lingua.llm.ollama;
 
-import dev.rehm.lingua.conversation.MessageService;
+import dev.rehm.lingua.agent.message.MessageService;
 import dev.rehm.lingua.llm.LlmProfile;
 import dev.rehm.lingua.llm.LlmProfileFactory;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;

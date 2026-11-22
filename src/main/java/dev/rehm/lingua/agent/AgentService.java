@@ -2,32 +2,24 @@ package dev.rehm.lingua.agent;
 
 import java.util.concurrent.*;
 
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-
 import dev.rehm.lingua.agent.context.AgentExecutionContext;
 import dev.rehm.lingua.agent.inspection.AgentExecutionResult;
 import dev.rehm.lingua.agent.inspection.AgentResponseIssue;
 import dev.rehm.lingua.agent.inspection.AgentTerminationReason;
 import dev.rehm.lingua.common.exception.classes.*;
 import dev.rehm.lingua.conversation.ConversationService;
-import dev.rehm.lingua.conversation.MessageService;
+import dev.rehm.lingua.agent.message.MessageService;
 import dev.rehm.lingua.llm.LlmProfileService;
-import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import dev.rehm.lingua.llm.LlmProfiles;
 import dev.rehm.lingua.chat.dto.ChatRequest;
 import dev.rehm.lingua.llm.ollama.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.llm.ollama.dto.response.OllamaChatResponse;
-import dev.rehm.lingua.llm.ollama.dto.response.OllamaToolCallResponse;
-import dev.rehm.lingua.conversation.MessageFactory;
+import dev.rehm.lingua.agent.message.MessageFactory;
 import dev.rehm.lingua.llm.ollama.RequestFactory;
 import dev.rehm.lingua.llm.ollama.OllamaService;
 import dev.rehm.lingua.tool.*;
-import dev.rehm.lingua.tool.ToolExecutionTiming;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.*;
 
@@ -99,7 +91,7 @@ public class AgentService {
 
 
             if (context.getHasToolCalling()) {
-                context.addToolResults(toolCallingProcess(context));
+                context.addToolResults(executorService.toolCallingProcess(context));
 
 
                 for (ToolExecutionResult toolExecutionResult : context.getResults()) {
@@ -114,7 +106,7 @@ public class AgentService {
 
 
         conversationService.messageSave(context.getUuid(), context.getPendingMessages());
-        messageService.soutMessageList(conversationService.getMessageList(context.getUuid()));
+        conversationService.soutMessageList(conversationService.getMessageList(context.getUuid()));
         logIterationBudget(context);
 
         return createExecutionResult(AgentTerminationReason.COMPLETED, context);
@@ -243,7 +235,7 @@ public class AgentService {
 
         conversationService.messageSave(context.getUuid(), context.getPendingMessages());
 
-        messageService.soutMessageList(conversationService.getMessageList(context.getUuid()));
+        conversationService.soutMessageList(conversationService.getMessageList(context.getUuid()));
         logIterationBudget(context);
         System.out.println("-------end-----------");
 
@@ -321,166 +313,6 @@ public class AgentService {
     }
 
 
-    private void executeMultiTool(ExecutorService executor, ToolExecutionBatch toolExecutionBatch,
-                                  List<OllamaToolCallResponse> calls, int approved) {
-
-        for (int i = 0; i < approved; i++) {
-            OllamaToolCallResponse call = calls.get(i);
-            int index = i;
-
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-            toolExecutionBatch.setDeadlinesNanos(i, deadline);
-
-            toolExecutionBatch.addFuture(
-                    executor.submit(() -> {
-                        toolExecutionBatch.setToolThread(index, Thread.currentThread());
-                        Instant startedAt = Instant.now();
-                        toolExecutionBatch.setToolStartedAt(index, startedAt);
-
-
-                        try {
-                            return executorService.executeTool(call, index, startedAt);
-                        } finally {
-                            toolExecutionBatch.setFinishedAtNanos(index, System.nanoTime());
-                        }
-                    })
-            );
-        }
-    }
-
-    private ToolExecutionResult executeResult(ToolExecutionBatch toolExecutionBatch,
-                                              int index) throws TimeoutException, ExecutionException, InterruptedException {
-
-        long remainingNanos =
-                toolExecutionBatch.getDeadlinesNanos(index) - System.nanoTime();
-
-
-        ToolExecutionResult result = toolExecutionBatch.getFuture(index).get(
-                Math.max(0, remainingNanos),
-                TimeUnit.NANOSECONDS
-        );
-
-        if (toolExecutionBatch.getFinishedAtNanos(index) - toolExecutionBatch.getDeadlinesNanos(index) > 0) {
-            throw new TimeoutException(
-                    "Tool completed after deadline"
-            );
-        }
-
-        return result;
-    }
-
-
-
-    private void saveToolExecutionMessage(AgentExecutionContext context, ToolExecutionResult result) {
-        OllamaMessageDto toolMessage = MessageFactory.createToolMessageDto(result.toolName(),result);
-
-        context.addPendingMessage(toolMessage);
-
-    }
-
-
-    private ToolExecutionResult createSkippedResult(List<OllamaToolCallResponse> calls, int index) {
-        OllamaToolCallResponse call = calls.get(index);
-
-        return new ToolExecutionResult(
-                call.function().name(),
-                call.function().arguments(),
-                "Tool limit reached",
-                ToolExecutionStatus.SKIPPED,
-                Instant.now(),
-                0,
-                null,
-                false,
-                index
-        );
-    }
-
-
-    private ToolExecutionResult createErrorResult(
-            List<OllamaToolCallResponse> calls,
-            ToolExecutionBatch batch,
-            int index,
-            ToolExecutionStatus status,
-            String errorMessage
-    ) {
-        ToolExecutionTiming timing =
-                new ToolExecutionTiming(batch, index);
-
-        Thread thread = batch.getToolThreads(index);
-
-        return new ToolExecutionResult(
-                calls.get(index).function().name(),
-                calls.get(index).function().arguments(),
-                errorMessage,
-                status,
-                timing.getExecutedAt(),
-                timing.getDurationMs(),
-                thread == null ? null : thread.threadId(),
-                thread != null && thread.isVirtual(),
-                index
-        );
-    }
-
-    private List<ToolExecutionResult> toolCallingProcess(
-            AgentExecutionContext context
-    ) {
-        List<OllamaToolCallResponse> calls =
-                context.getResponse().message().toolCalls();
-
-        int approved = context.getAgentExecutionBudget().reserveBudget(calls.size());
-        List<ToolExecutionResult> results = new ArrayList<>();
-
-        ExecutorService executor =
-                Executors.newVirtualThreadPerTaskExecutor();
-
-        try {
-            ToolExecutionBatch toolExecutionBatch = new ToolExecutionBatch(approved);
-            executeMultiTool(executor, toolExecutionBatch, calls, approved);
-
-            for (int i = 0; i < calls.size(); i++) {
-
-                ToolExecutionResult result;
-
-                if (i < approved) {
-                    try {
-
-                        result = executeResult(toolExecutionBatch, i);
-
-                    }catch (TimeoutException e) {
-                        toolExecutionBatch.getFuture(i).cancel(true);
-
-                        result = createErrorResult(
-                                calls, toolExecutionBatch, i,
-                                ToolExecutionStatus.TIMEOUT,
-                                "Tool execution timed out"
-                        );
-
-                    }catch (InterruptedException e) {
-                        toolExecutionBatch.getFutures().forEach(f -> f.cancel(true));
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException(
-                                "Tool execution interrupted", e
-                        );
-
-                    } catch (ExecutionException e) {
-                        result = createErrorResult(
-                                calls, toolExecutionBatch, i,
-                                ToolExecutionStatus.FAILED,
-                                "Tool execution failed"
-                        );
-                    }
-                } else {
-                    result = createSkippedResult(calls, i);
-                }
-                results.add(result);
-                saveToolExecutionMessage(context, result);
-            }
-        } finally {
-            executor.shutdownNow();
-        }
-
-        return results;
-    }
 
     private @NotNull boolean hasToolCalling(OllamaChatResponse response) {
         if (response.message().toolCalls() == null) {

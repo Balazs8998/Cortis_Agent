@@ -40,4 +40,11 @@ public class ConversationService {
                 .getConversation(uuid)
                 .executeSerialized(action);
     }
+
+    public void soutMessageList(List<OllamaMessageDto> messageDtos) {
+        for (OllamaMessageDto messageDto : messageDtos) {
+            System.out.println(messageDto);
+        }
+        System.out.println("------------------------------------");
+    }
 }

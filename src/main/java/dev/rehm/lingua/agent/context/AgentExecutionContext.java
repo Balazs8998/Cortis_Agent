@@ -2,7 +2,7 @@ package dev.rehm.lingua.agent.context;
 
 import dev.rehm.lingua.agent.iteration.AgentExecutionBudget;
 import dev.rehm.lingua.chat.dto.ChatRequest;
-import dev.rehm.lingua.conversation.MessageFactory;
+import dev.rehm.lingua.agent.message.MessageFactory;
 import dev.rehm.lingua.llm.LlmProfiles;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import dev.rehm.lingua.llm.ollama.dto.response.OllamaChatResponse;
@@ -15,58 +15,52 @@ import java.util.UUID;
 
 public class AgentExecutionContext {
 
-    private final String userMessage;
     private final UUID uuid;
     private final AgentExecutionBudget agentExecutionBudget;
     private final List<ToolExecutionResult> toolResults;
     private boolean hasToolCalling;
     private OllamaChatResponse response;
-    private final OllamaMessageDto newMessage;
     private final LlmProfiles llmProfiles;
-    private boolean userMessageCommited;
-    private final List<OllamaMessageDto> pendingMessages =
-            new ArrayList<>();
-    private final List<OllamaMessageDto> committedHistory =
-            new ArrayList<>();
+    private final AgentConversationContext conversationContextcontext;
+
+
 
 
     public AgentExecutionContext(ChatRequest request,
                                  LlmProfiles llmProfiles) {
+        this.conversationContextcontext = new AgentConversationContext();
 
-        this.userMessage = request.message();
+        String userMessage = request.message();
+        OllamaMessageDto newMessage = MessageFactory.createUserMessageDto(userMessage);
         this.uuid = request.conversationId();
+        this.llmProfiles = llmProfiles;
+
         this.agentExecutionBudget = new AgentExecutionBudget(6,4);
+
         this.toolResults = new ArrayList<>();
         this.hasToolCalling = true;
+
         this.response = null;
-        this.newMessage = MessageFactory.createUserMessageDto(userMessage);
-        this.llmProfiles = llmProfiles;
-        this.userMessageCommited = false;
-        addPendingMessage(newMessage);
+
+        this.conversationContextcontext.addPendingMessage(newMessage);
     }
 
 
 
     public List<OllamaMessageDto> getMessagesForLlm() {
-
-        List<OllamaMessageDto> messagesForLlm =
-                new ArrayList<>(committedHistory);
-
-        messagesForLlm.addAll(pendingMessages);
-
-        return messagesForLlm;
+        return this.conversationContextcontext.getMessagesForLlm();
     }
 
     public void setCommittedHistory(List<OllamaMessageDto> messageHistory){
-        this.committedHistory.addAll(messageHistory);
+        this.conversationContextcontext.setCommittedHistory(messageHistory);
     }
 
     public void addPendingMessage(OllamaMessageDto message) {
-        pendingMessages.add(message);
+        this.conversationContextcontext.addPendingMessage(message);
     }
 
     public List<OllamaMessageDto> getPendingMessages() {
-        return List.copyOf(pendingMessages);
+        return conversationContextcontext.getPendingMessages();
     }
 
     public void addToolResults(List<ToolExecutionResult> resultList){
@@ -101,19 +95,11 @@ public class AgentExecutionContext {
         this.response = response;
     }
 
-    public OllamaMessageDto getNewMessage() {
-        return newMessage;
-    }
+
 
     public LlmProfiles getLlmProfiles() {
         return llmProfiles;
     }
 
-    public boolean isUserMessageCommited() {
-        return userMessageCommited;
-    }
 
-    public void setIsUserMessageCommited(boolean userMessageCommited) {
-        this.userMessageCommited = userMessageCommited;
-    }
 }

@@ -1,5 +1,6 @@
 package dev.rehm.lingua.conversation;
 
+import dev.rehm.lingua.agent.message.MessageFactory;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import org.junit.jupiter.api.Test;
 

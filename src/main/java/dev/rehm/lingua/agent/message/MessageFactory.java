@@ -1,4 +1,4 @@
-package dev.rehm.lingua.conversation;
+package dev.rehm.lingua.agent.message;
 
 import dev.rehm.lingua.common.util.JsonMapperUtil;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;

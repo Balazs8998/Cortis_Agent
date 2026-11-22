@@ -5,7 +5,7 @@ import dev.rehm.lingua.chat.dto.ChatRequest;
 import dev.rehm.lingua.common.exception.classes.AgentEmptyFinalResponseException;
 import dev.rehm.lingua.conversation.ConversationMemory;
 import dev.rehm.lingua.conversation.ConversationService;
-import dev.rehm.lingua.conversation.MessageService;
+import dev.rehm.lingua.agent.message.MessageService;
 import dev.rehm.lingua.llm.LlmProfile;
 import dev.rehm.lingua.llm.LlmProfileService;
 import dev.rehm.lingua.llm.LlmProfiles;

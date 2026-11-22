@@ -1,14 +1,11 @@
-package dev.rehm.lingua.conversation;
+package dev.rehm.lingua.agent.message;
 
+import dev.rehm.lingua.common.util.JsonMapperUtil;
 import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.List;
-import java.util.UUID;
-
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class MessageService {
@@ -167,19 +164,10 @@ public class MessageService {
             """;
 
 
-
-    private final ObjectMapper objectMapper;
-
-
-    public MessageService(ObjectMapper objectMapper) {
-
-        this.objectMapper = objectMapper;
-    }
-
-
     private static String buildSystemPrompt() {
-        return SYSTEM_PROMPT_TEMPLATE.formatted(
-                LocalDate.now(ZoneId.of("Europe/Berlin"))
+
+        return JsonMapperUtil.toJson(SYSTEM_PROMPT_TEMPLATE.formatted(
+                LocalDate.now(ZoneId.of("Europe/Berlin")))
         );
     }
 
@@ -189,12 +177,7 @@ public class MessageService {
 
     }
 
-    public void soutMessageList(List<OllamaMessageDto> messageDtos) {
-        for (OllamaMessageDto messageDto : messageDtos) {
-            System.out.println(messageDto);
-        }
-        System.out.println("------------------------------------");
-    }
+
 
 
 
