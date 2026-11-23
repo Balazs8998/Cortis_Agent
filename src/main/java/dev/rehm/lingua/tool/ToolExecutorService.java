@@ -141,7 +141,7 @@ public class ToolExecutorService {
                     toolName,
                     arguments,
                     result,
-                    ToolExecutionStatus.SUCCES,
+                    ToolExecutionStatus.SUCCESS,
                     executedAt,
                     (System.nanoTime() - start) / 1_000_000.0,
                     currentThread.threadId(),
@@ -252,17 +252,13 @@ public class ToolExecutorService {
                 || call.function().name() == null
                 || call.function().name().isBlank()) {
 
-            return createFailedResult(
-                    calls,
-                    index
-            );
+            return createFailedResult(index);
         }
 
         return createSkippedResult(calls, index);
     }
 
-    private ToolExecutionResult createFailedResult(List<OllamaToolCallResponse> calls, int index) {
-        OllamaToolCallResponse call = calls.get(index);
+    private ToolExecutionResult createFailedResult(int index) {
 
         return new ToolExecutionResult(
                 "UNKNOW",

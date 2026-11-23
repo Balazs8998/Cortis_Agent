@@ -166,8 +166,8 @@ public class MessageService {
 
     private static String buildSystemPrompt() {
 
-        return JsonMapperUtil.toJson(SYSTEM_PROMPT_TEMPLATE.formatted(
-                LocalDate.now(ZoneId.of("Europe/Berlin")))
+        return SYSTEM_PROMPT_TEMPLATE.formatted(
+                LocalDate.now(ZoneId.of("Europe/Berlin"))
         );
     }
 

@@ -1,7 +1,7 @@
 package dev.rehm.lingua.tool;
 
 public enum ToolExecutionStatus {
-    SUCCES,
+    SUCCESS,
     FAILED,
     REJECTED,
     SKIPPED,

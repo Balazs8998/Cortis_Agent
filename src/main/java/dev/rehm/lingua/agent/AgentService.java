@@ -12,6 +12,7 @@ import dev.rehm.lingua.agent.message.MessageService;
 import dev.rehm.lingua.llm.LlmProfileService;
 import dev.rehm.lingua.llm.LlmProfiles;
 import dev.rehm.lingua.chat.dto.ChatRequest;
+import dev.rehm.lingua.llm.ollama.dto.OllamaMessageDto;
 import dev.rehm.lingua.llm.ollama.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.llm.ollama.dto.response.OllamaChatResponse;
 import dev.rehm.lingua.agent.message.MessageFactory;
@@ -20,6 +21,7 @@ import dev.rehm.lingua.llm.ollama.OllamaService;
 import dev.rehm.lingua.tool.*;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
+
 import java.time.Instant;
 import java.util.*;
 
@@ -81,7 +83,6 @@ public class AgentService {
         while (context.getHasToolCalling()) {
 
 
-
             if (context.getAgentExecutionBudget().getRemainingIterations() <= 0) {
                 AgentTerminationReason reason = AgentTerminationReason.ITERATION_LIMIT_REACHED;
                 return finishAfterLimit(reason, context);
@@ -91,12 +92,16 @@ public class AgentService {
 
 
             if (context.getHasToolCalling()) {
+
+                int toolCallLimit = context.getAgentExecutionBudget().getRemainingToolCall();
+                int toolCallsNumber = context.getResponse().message().toolCalls().size();
+
                 context.addToolResults(executorService.toolCallingProcess(context));
 
 
                 for (ToolExecutionResult toolExecutionResult : context.getResults()) {
 
-                    if (toolExecutionResult.status() == ToolExecutionStatus.SKIPPED) {
+                    if (toolCallsNumber > toolCallLimit) {
                         AgentTerminationReason reason = AgentTerminationReason.TOOL_LIMIT_REACHED;
                         return finishAfterLimit(reason, context);
                     }
@@ -109,9 +114,13 @@ public class AgentService {
         conversationService.soutMessageList(conversationService.getMessageList(context.getUuid()));
         logIterationBudget(context);
 
+
+        if ("length".equalsIgnoreCase(context.getResponse().doneReason())){
+
+            return createExecutionResult(AgentTerminationReason.FAILED, context);
+        }
         return createExecutionResult(AgentTerminationReason.COMPLETED, context);
     }
-
 
 
     private LlmProfiles choiceLlm(ChatRequest request) {
@@ -183,7 +192,7 @@ public class AgentService {
             );
         }
 
-        if(!response.done()){
+        if (!response.done()) {
             throw new AgentProcessFailedException(
                     "addMessage",
                     "boolean done",
@@ -197,7 +206,6 @@ public class AgentService {
                     "agentMessage", "role", response.message().role()
             );
         }
-
 
 
         System.out.printf(
@@ -220,11 +228,13 @@ public class AgentService {
                 ? "Agent iteration limit reached. "
                 : "Agent tool limit reached. ";
 
-        context.addPendingMessage(MessageFactory.createSystemMessageDto(
+        OllamaMessageDto errorMessage = MessageFactory.createSystemMessageDto(
                 message + "Report confirmed results and identify incomplete tasks."
-        ));
+        );
 
         OllamaChatRequest ollamaChatRequest = requestFactory.createBaseRequest(context.getMessagesForLlm(), context.getLlmProfiles().finalProfile());
+
+        ollamaChatRequest.messages().add(errorMessage);
 
         context.setResponse(agentMessage(ollamaChatRequest));
 
@@ -243,7 +253,7 @@ public class AgentService {
         return createExecutionResult(reason, context);
     }
 
-    private void validateFinalResponse(AgentExecutionContext context){
+    private void validateFinalResponse(AgentExecutionContext context) {
 
         OllamaChatResponse response = context.getResponse();
 
@@ -267,14 +277,14 @@ public class AgentService {
 
     }
 
-    private AgentExecutionResult createExecutionResult(AgentTerminationReason agentTerminationReason,AgentExecutionContext context) {
+    private AgentExecutionResult createExecutionResult(AgentTerminationReason agentTerminationReason, AgentExecutionContext context) {
 
         int successful = 0;
         int failed = 0;
 
         int toolCalls = context.getResults().size();
         for (ToolExecutionResult toolExecutionResult : context.getResults()) {
-            if (toolExecutionResult.status() == ToolExecutionStatus.SUCCES) {
+            if (toolExecutionResult.status() == ToolExecutionStatus.SUCCESS) {
                 successful += 1;
             }
             if (toolExecutionResult.status() == ToolExecutionStatus.FAILED
@@ -311,7 +321,6 @@ public class AgentService {
                 issues
         );
     }
-
 
 
     private @NotNull boolean hasToolCalling(OllamaChatResponse response) {

@@ -35,7 +35,7 @@ public class AgentExecutionContext {
         this.uuid = request.conversationId();
         this.llmProfiles = llmProfiles;
 
-        this.agentExecutionBudget = new AgentExecutionBudget(6,4);
+        this.agentExecutionBudget = new AgentExecutionBudget(4,6);
 
         this.toolResults = new ArrayList<>();
         this.hasToolCalling = true;
