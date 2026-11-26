@@ -6,7 +6,7 @@ import dev.rehm.lingua.llm.ollama.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.llm.ollama.dto.request.RequestOption;
 import dev.rehm.lingua.llm.ollama.dto.request.RequestTool;
 import dev.rehm.lingua.tool.ToolRegistry;
-import dev.rehm.lingua.conversation.MessageService;
+import dev.rehm.lingua.agent.message.MessageService;
 import dev.rehm.lingua.tool.AgentTool;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Component;

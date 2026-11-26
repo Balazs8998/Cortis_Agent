@@ -19,6 +19,9 @@ public record ChatResponse(
         int failed,
         AgentTerminationReason agentTerminationReason,
         Set<AgentResponseIssue> agentResponseIssues,
-        String doneReason
+        String doneReason,
+        Integer evalCount,
+        Long promptEvalCount,
+        Long evalDuration
 ) {
 }

@@ -1,4 +1,4 @@
-package dev.rehm.lingua.tool.calculator;
+package dev.rehm.lingua.tool.tools.calculator;
 
 import dev.rehm.lingua.tool.ArgumentHandler;
 import dev.rehm.lingua.tool.schema.ToolRequestFunction;

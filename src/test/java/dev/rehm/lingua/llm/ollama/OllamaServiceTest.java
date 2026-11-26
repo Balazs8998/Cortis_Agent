@@ -54,8 +54,9 @@ class OllamaServiceTest {
                 new OllamaMessageDto("assistant", null, "Szia!", null),
                 true,
                 "stop",
-                10
-        );
+                10,
+                23L,
+                2L        );
 
         when(client.sendMessageToClient(request))
                 .thenReturn(expectedResponse);

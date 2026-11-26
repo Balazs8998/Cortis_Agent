@@ -24,6 +24,10 @@ public class ConversationService {
         return conversationMessage.getUuid().toString();
     }
 
+    public void messageSave(UUID uuid, List<OllamaMessageDto> messageDtoList){
+        memory.addMessageToChat(uuid,messageDtoList);
+    }
+
     public List<OllamaMessageDto> getMessageList(UUID uuid){
         return memory.getMessageList(uuid);
     }
@@ -35,5 +39,12 @@ public class ConversationService {
         return memory
                 .getConversation(uuid)
                 .executeSerialized(action);
+    }
+
+    public void soutMessageList(List<OllamaMessageDto> messageDtos) {
+        for (OllamaMessageDto messageDto : messageDtos) {
+            System.out.println(messageDto);
+        }
+        System.out.println("------------------------------------");
     }
 }

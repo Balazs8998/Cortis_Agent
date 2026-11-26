@@ -25,7 +25,7 @@ export interface ChatResponse {
   agentTerminationReason: AgentTerminationReason;
 }
 
-export type AgentTerminationReason = 'COMPLETED' | 'ITERATION_LIMIT_REACHED' | 'TOOL_LIMIT_REACHED';
+export type AgentTerminationReason = 'COMPLETED' | 'ITERATION_LIMIT_REACHED' | 'TOOL_LIMIT_REACHED' | 'FAILED';
 
 export type ToolExecutionStatus =
   'SUCCESS' | 'SUCCES' | 'FAILED' | 'SKIPPED' | 'REJECTED' | 'TIMEOUT';

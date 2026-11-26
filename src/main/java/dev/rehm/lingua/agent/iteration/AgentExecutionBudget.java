@@ -5,11 +5,12 @@ import dev.rehm.lingua.common.exception.classes.ToolBudgetException;
 
 public class AgentExecutionBudget {
 
-    int remainingToolCall;
+
     int remainingIterations;
+    int remainingToolCall;
     int iterations;
 
-    public AgentExecutionBudget(int remainingToolCall, int remainingIterations) {
+    public AgentExecutionBudget(int remainingIterations, int remainingToolCall) {
         this.remainingToolCall = remainingToolCall< 0 ? 4 : remainingToolCall;
         this.remainingIterations = remainingIterations<= 0 ? 6 : remainingIterations;
         this.iterations = 0;

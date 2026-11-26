@@ -18,5 +18,6 @@ public record AgentExecutionResult(
         AgentTerminationReason agentTerminationReason,
         Set<AgentResponseIssue> agentResponseIssues
 
+
 ) {
 }

@@ -5,6 +5,7 @@ import dev.rehm.lingua.llm.ollama.dto.request.OllamaChatRequest;
 import dev.rehm.lingua.llm.ollama.dto.response.OllamaChatResponse;
 import dev.rehm.lingua.common.exception.classes.OllamaTimeoutException;
 import dev.rehm.lingua.llm.client.ClientInterface;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -16,7 +17,9 @@ public class OllamaClient implements ClientInterface<OllamaChatRequest, OllamaCh
 
     private final RestClient client;
 
-    public OllamaClient(RestClient client) {
+    public OllamaClient(
+            @Qualifier("ollamaRestClient") RestClient client
+    ) {
         this.client = client;
     }
 
